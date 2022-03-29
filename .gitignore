@@ -1,0 +1,6 @@
+/target
+/pkg
+/wasm-pack.log
+/www
+Cargo.lock
+.vscode
