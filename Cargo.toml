@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "cmd",
+    "graph",
+    "binding",
+]
+
+exclude = [
+    "dot_files",
+]
+
+[profile.release]
+lto = true
+
+[profile.dev]
+debug-assertions = true
+
+[profile.test]
+debug-assertions = true

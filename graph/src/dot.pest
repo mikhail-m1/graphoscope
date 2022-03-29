@@ -1,0 +1,13 @@
+graph = { SOI ~ ws ~ magic_word ~ WS ~ name ~ ws ~ "{" ~ ws ~ statements ~ ws  ~ "}" ~ ws ~ EOI }
+magic_word =  _{ "digraph" }
+statements = { (statement ~ ws)* }
+statement = _{ (node | link) ~ ";" }
+node = { !(name ~ ws ~ "->") ~ name ~ ws ~ attributes? }
+link = { name ~ ws ~ "->" ~ ws ~ name ~ ws ~ attributes? }
+attributes = {"[" ~ ws ~ name ~ ws ~ "=" ~ ws ~ string ~ ws ~ "]"} 
+name = { (ASCII_ALPHANUMERIC | "_" )+ }
+string = _{"\"" ~ string_content ~ "\""}
+string_content = {(!("\"") ~ ANY)*}
+space = _{ " " | "\t" | "\r" | "\n" }
+ws = _{ space* }
+WS = _{ space+ }

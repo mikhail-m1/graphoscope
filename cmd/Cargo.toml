@@ -1,0 +1,10 @@
+[package]
+name = "cmd"
+version = "0.1.0"
+authors = ["Mikhail Modin <mikhailm1@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+graph = { path = "../graph" }
+simplelog = "0.11"
+log = "0.4"

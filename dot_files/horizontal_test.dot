@@ -1,0 +1,10 @@
+digraph test {
+0 -> a,b,c,d,e, 0;
+e -> 0;
+a->a;
+a -> b [minlen=0];
+a -> c [minlen=0];
+a -> d [minlen=0];
+a -> e [minlen=0];
+e -> a [minlen=0];
+}
