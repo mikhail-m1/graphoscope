@@ -1,4 +1,9 @@
-use std::{fmt::Debug, fs::File, io::Write};
+use std::{
+    env,
+    fmt::{Debug, Display},
+    fs::File,
+    io::Write,
+};
 
 //TODO: can be optimized: use hashmap for creating
 impl<T: Eq + Debug + Clone> DirectedGraph<T> {
@@ -205,6 +210,10 @@ impl<T> DirectedGraph<T> {
         NodeFilter: Fn(&DirectedGraph<T>, NodeId) -> bool,
         EdgeFilter: Fn(&DirectedGraph<T>, EdgeId) -> bool,
     {
+        if env::var("GS_DUMP_STEPS").is_err() {
+            return;
+        }
+
         let mut file = File::create(filename).unwrap();
         let mut buf = "digraph temp {".to_string();
 
@@ -232,6 +241,62 @@ impl<T> DirectedGraph<T> {
 
         buf += "}";
         file.write_all(buf.as_bytes()).unwrap();
+    }
+}
+
+impl<T: Display> DirectedGraph<T> {
+    pub fn dot_result<W: Write>(&self, mut write: W, ranks: &NodeMap<i32>, places: &NodeMap<u32>) {
+        write
+            .write_all("digraph temp {\n".as_bytes())
+            .expect("success");
+
+        for (id, _) in self.iter_nodes_with_id().filter(|&(_, n)| !n.is_virtual) {
+            write
+                .write_all(
+                    format!(
+                        "{}[pos=\"{},{}\"];\n",
+                        self.original_id(id).unwrap(),
+                        places.get(id),
+                        ranks.get(id),
+                    )
+                    .as_bytes(),
+                )
+                .expect("success");
+        }
+
+        for edge in self.iter_edges() {
+            let (from, to) = if edge.is_inverted() {
+                (edge.to, edge.from)
+            } else {
+                (edge.from, edge.to)
+            };
+            let from_name = self
+                .original_id(from)
+                .map(|v| format!("{}", v))
+                .unwrap_or(format!("v_{}", from.0));
+
+            let to_name = self
+                .original_id(from)
+                .map(|v| format!("{}", v))
+                .unwrap_or(format!("v_{}", to.0));
+
+            write
+                .write_all(
+                    format!(
+                        "{} -> {}[pos=\"e{},{} {},{}\"];\n",
+                        from_name,
+                        to_name,
+                        places.get(from),
+                        ranks.get(from),
+                        places.get(to),
+                        ranks.get(to)
+                    )
+                    .as_bytes(),
+                )
+                .expect("success");
+        }
+
+        write.write_all("}".as_bytes()).expect("success")
     }
 }
 

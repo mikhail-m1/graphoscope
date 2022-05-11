@@ -2,7 +2,7 @@
 
 ## graph
 * make graph api consistent, migrate loops to it
-* more consistent logging, option to enable graph dumps
+* more consistent logging
 * ns: remove length?
 * ns: unify shift
 * ns: state for negative graph search
@@ -12,7 +12,6 @@
 * same level edges, self edges, back edges, duplicated edges
 * implement search for layer with min nodes in ns top bottom 
 * debug only asserts
-* write debug graph only with env variable
 
 ## BUGS:
 * same level lines, but it's not possible without minlen attribute
