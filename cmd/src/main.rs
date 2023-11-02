@@ -8,7 +8,7 @@ fn main() {
     let _ = simplelog::TermLogger::init(
         simplelog::LevelFilter::Debug,
         simplelog::Config::default(),
-        simplelog::TerminalMode::Mixed,
+        simplelog::TerminalMode::Stderr,
         simplelog::ColorChoice::Auto,
     );
     if args().len() <= 1 {
