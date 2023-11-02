@@ -71,7 +71,7 @@ pub fn x_coordinates<T: Debug>(
     }
 
     //TODO: need to make additional tweaks to center clusters with slack
-    let coordinates = network_simplex(&temp_graph, crate::ns::Postprocess::Center);
+    let coordinates = network_simplex(&temp_graph, crate::ns::Postprocess::Center, None);
 
     //TODO: maybe just return coordinates or downsize it?
     let mut result = graph.node_map();

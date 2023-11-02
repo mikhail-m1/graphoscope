@@ -1,7 +1,7 @@
 use crate::graph::*;
 use std::{fmt::Debug, mem};
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Postprocess {
     None,
     Center,
@@ -11,8 +11,10 @@ pub enum Postprocess {
 pub fn network_simplex<T: Debug>(
     graph: &DirectedGraph<T>,
     postprocess: Postprocess,
+    opt_ranks: Option<NodeMap<i32>>,
 ) -> NodeMap<i32> {
-    let mut ranks = rank(&graph);
+    let mut ranks = opt_ranks.unwrap_or(rank(&graph));
+    debug!("initial ranks: {ranks:?}");
     _validate_rank(graph, &ranks);
     let mut data = span_tree(&graph, &mut ranks);
     _validate_rank(graph, &ranks);
@@ -20,14 +22,15 @@ pub fn network_simplex<T: Debug>(
     minmax(&graph, &mut data.nodes);
     cut_value(&graph, &mut data);
 
+    let mut iter = 0;
     let mut negative_edge_search = NegativeEdgeSearch::new();
     while let Some(negative_edge) = negative_edge_search.next(&graph, &data) {
         graph.dump(
-            "tmp_ns_before_replacment.dot",
+            &format!("tmp_ns_before_replacement_{postprocess:?}_{iter}.dot"),
             &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).into(),
             &|_, id, edge| {
                 format!(
-                    "c{} s{} l{}",
+                    "cut:{} slack:{} len:{}",
                     data.edges.get(id).cut_value,
                     data.edges.get(id).slack(edge),
                     data.edges.get(id).length,
@@ -52,16 +55,18 @@ pub fn network_simplex<T: Debug>(
             replacement_edge,
         );
         graph.dump(
-            "tmp_ns_shift_done.dot",
+            &format!("tmp_ns_replacement_and_shift_done_{postprocess:?}_{iter}.dot"),
             &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).to_string(),
             &|_, _, _| "".into(),
             &|_, _| true,
             &|_, id| data.edges.get(id).in_tree,
         );
         _validate_rank(graph, &ranks);
+        iter += 1;
     }
 
     normalize(&mut ranks);
+    debug!("before post process ranks: {ranks:?}");
 
     if postprocess == Postprocess::Center {
         for edge_id in data.edges.iter_ids() {
@@ -77,13 +82,15 @@ pub fn network_simplex<T: Debug>(
                 .slack(graph.edge(replacement_edge))
                 / 2) as i32;
             if shift_ != 0 {
-                println!("shift {:?} {}", edge_id, shift_);
+                debug!("shift {:?} {}", edge_id, shift_);
                 shift(graph, &mut data, &mut ranks, edge_id, shift_);
             }
         }
     }
+    debug!("after post process ranks: {ranks:?}");
+
     graph.dump(
-        "tmp_ns_done.dot",
+        &format!("tmp_ns_done_{postprocess:?}.dot"),
         &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).to_string(),
         &|_, _, _| "".into(),
         &|_, _| true,
@@ -107,6 +114,7 @@ fn rank<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
     let mut ranks = graph.node_map();
 
     while let Some(id) = stack.pop() {
+        debug!("rank: process {id:?}");
         let node = graph.node(id);
         let opt_rank = node
             .inputs
@@ -115,6 +123,12 @@ fn rank<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
             .max(); //bug for same level input nodes (but they are not supported)
         for &edge_id in &node.outputs {
             let edge = graph.edge(edge_id);
+            debug!(
+                "rank: found {:?}, inputs = {}, fount = {}",
+                edge.to,
+                graph.node(edge.to).inputs.len(),
+                *found_inputs.get(edge.to) + 1
+            );
             if graph.node(edge.to).inputs.len() - 1 == *found_inputs.get(edge.to) as usize {
                 stack.push(edge.to)
             } else {
@@ -218,10 +232,7 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
                     continue;
                 }
                 tree.set(other_side_id, current_tree);
-                debug!(
-                    "span_tree: add {:?} to {} tree",
-                    other_side_id, current_tree
-                );
+                debug!("span_tree: add {other_side_id:?} to tree {current_tree} through {edge:?}");
                 stack.push(other_side_id);
                 edge_data.get_mut(edge_id).in_tree = true;
                 if direction == Direction::Output {
@@ -237,7 +248,7 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
     //merge trees
     while current_tree != 1 {
         graph.dump(
-            "tmp_span_tree.dot",
+            &format!("tmp_span_tree join_cnt_{current_tree}.dot"),
             &|_, id, _| format!("{:?} T:{} r:{}", id, tree.get(id), ranks.get(id)).to_string(),
             &|_, _, _| "".into(),
             &|_, _| true,
@@ -246,23 +257,25 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
 
         _validate_length(graph, &ranks, &edge_data);
         // search for min edge
-        let mut min_edge_id = UNEXISTED_EDGE_ID;
+        let mut min_edge_id = None;
         let mut min_edge_slack = u32::MAX;
         for id in tree.iter_ids().filter(|&id| *tree.get(id) == 1) {
             for (_, edge_id, edge, direction) in graph.iter_node_edges(id) {
                 if *tree.get(edge.other_side(direction)) == 1 {
                     continue;
                 }
-                debug!("process {:?}", edge);
+                debug!("span_tree: process {:?}", edge);
                 let slack = edge_data.get_mut(edge_id).slack(edge);
                 if slack < min_edge_slack {
-                    min_edge_id = edge_id;
+                    min_edge_id = Some(edge_id);
                     min_edge_slack = slack;
                 }
                 //TODO: can we break if have slack = 1? other edges' length still unupdated
             }
         }
-        assert_ne!(min_edge_id, UNEXISTED_EDGE_ID);
+        assert!(min_edge_id.is_some());
+
+        let min_edge_id = min_edge_id.unwrap();
 
         let edge = graph.edge(min_edge_id);
         let &to_tree = tree.get(edge.to);
@@ -289,7 +302,7 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
         };
 
         debug!(
-            "merge tree {} and {} with {:?} slack {}",
+            "span_tree: merge tree {} and {} with {:?} slack {}",
             from_tree, to_tree, edge, slack
         );
         assert_ne!(from_tree, to_tree);
@@ -321,6 +334,8 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
         }
         current_tree -= 1;
     }
+
+    debug!("span_tree: done");
 
     NetworkSimplexData {
         nodes: node_data,
@@ -890,7 +905,7 @@ mod tests {
         );
         dag.edge_mut(EdgeId::from(6u32)).weight = 0;
         dag.edge_mut(EdgeId::from(7u32)).weight = 0;
-        let ranks = network_simplex(&dag, Postprocess::None);
+        let ranks = network_simplex(&dag, Postprocess::None, None);
         assert_ranks(&ranks, &[1, 1, 0, 2, 1, 2, 3])
     }
 
@@ -904,7 +919,7 @@ mod tests {
         );
         dag.edge_mut(EdgeId::from(4u32)).min_length = 100;
         dag.edge_mut(EdgeId::from(4u32)).weight = 0;
-        let ranks = network_simplex(&dag, Postprocess::Center);
+        let ranks = network_simplex(&dag, Postprocess::Center, None);
         assert_ranks(&ranks, &[0, 50, 100, 51, 101, 101, 1])
     }
 
@@ -912,7 +927,7 @@ mod tests {
     fn network_simplex_loop() {
         let mut dag = DirectedGraph::new(&[], &[(0, 1), (1, 2), (2, 0)]);
         to_dag(&mut dag);
-        let ranks = network_simplex(&dag, Postprocess::None);
+        let ranks = network_simplex(&dag, Postprocess::None, None);
         assert_ranks(&ranks, &[0, 1, 2])
     }
 }

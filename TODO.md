@@ -1,8 +1,10 @@
 # TODO
 
+## high priority bug
+* check why right and right_explicit return different result, it's in place.rs
+
 ## graph
 * make graph api consistent, migrate loops to it
-* more consistent logging
 * ns: remove length?
 * ns: unify shift
 * ns: state for negative graph search

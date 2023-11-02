@@ -17,12 +17,12 @@ extern crate pest_derive;
 pub fn rank_with_components<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
     let (components, map) = split_components(graph);
     if components.len() == 1 {
-        ns::network_simplex(graph, ns::Postprocess::None)
+        ns::network_simplex(graph, ns::Postprocess::None, None)
     } else {
         let component_ranks: Vec<_> = components
             .iter()
             .inspect(|c| debug!("{:?}", c))
-            .map(|c| ns::network_simplex(c, ns::Postprocess::None))
+            .map(|c| ns::network_simplex(c, ns::Postprocess::None, None))
             .collect();
         merge_components(graph, &map, &component_ranks)
     }
@@ -46,6 +46,11 @@ impl Default for NewNodePlace {
 pub fn split_components<T: Debug>(
     graph: &DirectedGraph<T>,
 ) -> (Vec<DirectedGraph<()>>, NodeMap<NewNodePlace>) {
+    debug!(
+        "split_components() for DAG with {} nodes",
+        graph.nodes_count()
+    );
+
     struct S<'a, T: Debug> {
         graph: &'a DirectedGraph<T>,
         map: NodeMap<NewNodePlace>,
@@ -85,6 +90,7 @@ pub fn split_components<T: Debug>(
             component.node_mut(new_to).inputs.push(edge_id);
         }
     }
+
     let mut queue = vec![];
     let mut s = S {
         graph,

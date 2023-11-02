@@ -169,9 +169,7 @@ impl<T> DirectedGraph<T> {
     }
 
     pub fn node_map<V: Default + Clone>(&self) -> NodeMap<V> {
-        let mut values = vec![];
-        values.resize(self.nodes_count() as usize, V::default());
-        NodeMap { values }
+        NodeMap::new(self.nodes_count())
     }
 
     pub fn edge_map<V: Default + Clone>(&self) -> EdgeMap<V> {
@@ -301,6 +299,12 @@ impl<T: Display> DirectedGraph<T> {
 }
 
 impl<T: Default + Clone> NodeMap<T> {
+    pub fn new(size: u32) -> Self {
+        Self {
+            values: vec![T::default(); size as usize],
+        }
+    }
+
     pub fn get(&self, id: NodeId) -> &T {
         assert!((id.0 as usize) < self.values.len());
         &self.values[id.0 as usize]

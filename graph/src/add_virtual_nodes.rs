@@ -5,10 +5,11 @@ pub fn add_virtual_nodes<T: Debug>(graph: &mut DirectedGraph<T>, ranks: &mut Nod
     graph.for_each_edge_mut(&mut |graph, mut edge_id| {
         let edge = graph.edge(edge_id);
         let is_inverted = edge.kind == EdgeKind::Inverted;
+        let from_id = edge.from;
         let to_id = edge.to;
-        let mut from_rank = *ranks.get(edge.from);
-        let to_node = graph.node(edge.to);
-        let to_rank = *ranks.get(edge.to);
+        let mut from_rank = *ranks.get(from_id);
+        let to_node = graph.node(to_id);
+        let to_rank = *ranks.get(to_id);
         let to_edge_position = to_node.inputs.iter().position(|&e| e == edge_id).unwrap();
         debug_assert!(
             from_rank < to_rank,
@@ -23,6 +24,7 @@ pub fn add_virtual_nodes<T: Debug>(graph: &mut DirectedGraph<T>, ranks: &mut Nod
                 outputs: Vec::with_capacity(1),
                 is_virtual: true,
             });
+            debug!("add_virtual_nodes: new node {node_id:?} for link {from_id:?} {to_id:?}");
             ranks.set(node_id, from_rank + 1);
 
             graph.edge_mut(edge_id).to = node_id;
