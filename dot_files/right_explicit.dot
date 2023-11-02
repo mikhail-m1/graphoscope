@@ -1,0 +1,12 @@
+digraph right {
+
+    A -> B;
+    B -> C;
+    C -> D;
+    A -> E;
+    E -> I;
+    E -> J;
+    I -> D;
+    J -> D;
+
+}

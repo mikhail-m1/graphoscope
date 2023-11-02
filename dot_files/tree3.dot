@@ -1,0 +1,8 @@
+digraph right {
+
+    A -> B;
+    B -> C;
+    A -> E;
+    E -> I;
+    E -> J;
+}
