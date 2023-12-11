@@ -1,7 +1,7 @@
 use crate::graph::*;
 use std::{fmt::Debug, mem};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Postprocess {
     None,
     Center,
@@ -15,58 +15,44 @@ pub fn network_simplex<T: Debug>(
 ) -> NodeMap<i32> {
     let mut ranks = opt_ranks.unwrap_or(rank(&graph));
     debug!("initial ranks: {ranks:?}");
+    graph.dump(
+        &format!("tmp_ns_before_start_{postprocess:?}.dot"),
+        &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).into(),
+        &|_, _, edge| format!("weight:{} min_len:{}", edge.weight, edge.min_length,).into(),
+        &|_, _| true,
+        &|_, _| true,
+    );
+
     _validate_rank(graph, &ranks);
-    let mut data = span_tree(&graph, &mut ranks);
-    _validate_rank(graph, &ranks);
-    _validate_length(graph, &ranks, &data.edges);
-    minmax(&graph, &mut data.nodes);
-    cut_value(&graph, &mut data);
+    let mut data = &mut span_tree(&graph, postprocess, &mut ranks);
+    _validate_rank(graph, &data.ranks);
+    _validate_length(graph, &data.ranks, &data.edges);
+    minmax(data);
+    cut_value(data);
 
     let mut iter = 0;
     let mut negative_edge_search = NegativeEdgeSearch::new();
-    while let Some(negative_edge) = negative_edge_search.next(&graph, &data) {
-        graph.dump(
-            &format!("tmp_ns_before_replacement_{postprocess:?}_{iter}.dot"),
-            &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).into(),
-            &|_, id, edge| {
-                format!(
-                    "cut:{} slack:{} len:{}",
-                    data.edges.get(id).cut_value,
-                    data.edges.get(id).slack(edge),
-                    data.edges.get(id).length,
-                )
-                .into()
-            },
-            &|_, _| true,
-            &|_, id| data.edges.get(id).in_tree,
+    while let Some(negative_edge) = negative_edge_search.next(&data) {
+        dump_graph(&data, iter, "replace_before", Some(negative_edge));
+        debug!(
+            "search replacment for {:?} {:?}",
+            negative_edge,
+            data.graph.edge(negative_edge)
         );
-
-        let replacement_edge = find_replacement_edge(&graph, &data, negative_edge);
+        let replacement_edge = find_replacement_edge(&mut data, negative_edge);
         debug!(
             "replace negative {:?} by {:?}",
             graph.edge(negative_edge),
             graph.edge(replacement_edge)
         );
-        replace_edge(
-            &graph,
-            &mut data,
-            &mut ranks,
-            negative_edge,
-            replacement_edge,
-        );
-        graph.dump(
-            &format!("tmp_ns_replacement_and_shift_done_{postprocess:?}_{iter}.dot"),
-            &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).to_string(),
-            &|_, _, _| "".into(),
-            &|_, _| true,
-            &|_, id| data.edges.get(id).in_tree,
-        );
-        _validate_rank(graph, &ranks);
+        replace_edge(&mut data, negative_edge, replacement_edge);
+        dump_graph(&data, iter, "replace_done", Some(replacement_edge));
+        _validate_rank(graph, data.ranks);
         iter += 1;
     }
 
-    normalize(&mut ranks);
-    debug!("before post process ranks: {ranks:?}");
+    normalize(data.ranks);
+    debug!("before post process ranks: {:?}", data.ranks);
 
     if postprocess == Postprocess::Center {
         for edge_id in data.edges.iter_ids() {
@@ -75,27 +61,20 @@ pub fn network_simplex<T: Debug>(
                 continue;
             }
 
-            let replacement_edge = find_replacement_edge(&graph, &data, edge_id);
+            let replacement_edge = find_replacement_edge(&mut data, edge_id);
             let shift_ = (data
                 .edges
                 .get(replacement_edge)
                 .slack(graph.edge(replacement_edge))
                 / 2) as i32;
             if shift_ != 0 {
-                debug!("shift {:?} {}", edge_id, shift_);
-                shift(graph, &mut data, &mut ranks, edge_id, shift_);
+                debug!("shift {:?} {:?} {}", edge_id, graph.edge(edge_id), shift_);
+                shift(&mut data, edge_id, shift_);
             }
         }
     }
-    debug!("after post process ranks: {ranks:?}");
-
-    graph.dump(
-        &format!("tmp_ns_done_{postprocess:?}.dot"),
-        &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).to_string(),
-        &|_, _, _| "".into(),
-        &|_, _| true,
-        &|_, id| data.edges.get(id).in_tree,
-    );
+    debug!("after post process ranks: {:?}", data.ranks);
+    dump_graph(data, 0, "ns_done", None);
     ranks
 }
 
@@ -143,8 +122,11 @@ fn rank<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
 }
 
 #[derive(Debug)]
-struct NetworkSimplexData {
-    root: NodeId,
+struct NetworkSimplexData<'a, 'b, T> {
+    graph: &'a DirectedGraph<T>,
+    postprocess: Postprocess,
+    ranks: &'b mut NodeMap<i32>,
+    root: NodeId, // TODO: delete
     nodes: NodeMap<NetworkSimplexNodeData>,
     edges: EdgeMap<NetworkSimplexEdgeData>,
 }
@@ -196,7 +178,11 @@ impl NetworkSimplexNodeData {
     }
 }
 
-fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> NetworkSimplexData {
+fn span_tree<'a, 'b, T: Debug>(
+    graph: &'a DirectedGraph<T>,
+    postprocess: Postprocess,
+    ranks: &'b mut NodeMap<i32>,
+) -> NetworkSimplexData<'a, 'b, T> {
     let mut edge_data = graph.edge_map::<NetworkSimplexEdgeData>();
     let mut node_data = graph.node_map::<NetworkSimplexNodeData>();
 
@@ -248,7 +234,7 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
     //merge trees
     while current_tree != 1 {
         graph.dump(
-            &format!("tmp_span_tree join_cnt_{current_tree}.dot"),
+            &format!("tmp_span_tree_join_{current_tree}.dot"),
             &|_, id, _| format!("{:?} T:{} r:{}", id, tree.get(id), ranks.get(id)).to_string(),
             &|_, _, _| "".into(),
             &|_, _| true,
@@ -337,14 +323,17 @@ fn span_tree<T: Debug>(graph: &DirectedGraph<T>, ranks: &mut NodeMap<i32>) -> Ne
 
     debug!("span_tree: done");
 
-    NetworkSimplexData {
+    NetworkSimplexData::<'a, 'b, T> {
+        graph,
+        ranks,
+        postprocess,
         nodes: node_data,
         edges: edge_data,
         root: graph.iter_nodes_with_id().next().unwrap().0,
     }
 }
 
-fn minmax<T: Debug>(graph: &DirectedGraph<T>, data: &mut NodeMap<NetworkSimplexNodeData>) {
+fn minmax<'a, 'b, T: Debug>(data: &mut NetworkSimplexData<'a, 'b, T>) {
     fn imp<T: Debug>(
         graph: &DirectedGraph<T>,
         data: &mut NodeMap<NetworkSimplexNodeData>,
@@ -371,15 +360,15 @@ fn minmax<T: Debug>(graph: &DirectedGraph<T>, data: &mut NodeMap<NetworkSimplexN
     }
     let mut n = 1;
     imp(
-        graph,
-        data,
-        graph.iter_nodes_with_id().next().unwrap().0,
+        data.graph,
+        &mut data.nodes,
+        data.graph.iter_nodes_with_id().next().unwrap().0,
         UNEXISTED_EDGE_ID,
         &mut n,
     );
 }
 
-fn cut_value<T: Debug>(graph: &DirectedGraph<T>, data: &mut NetworkSimplexData) {
+fn cut_value<'a, 'b, T: Debug>(data: &mut NetworkSimplexData<'a, 'b, T>) {
     fn edge_value(edge: &Edge, node_id: NodeId, data: &NetworkSimplexEdgeData) -> i32 {
         let value = if data.in_tree {
             //FIXME need to check only own subtree
@@ -452,7 +441,7 @@ fn cut_value<T: Debug>(graph: &DirectedGraph<T>, data: &mut NetworkSimplexData) 
         }
     }
     imp(
-        graph,
+        data.graph,
         &data.nodes,
         data.root,
         UNEXISTED_EDGE_ID,
@@ -466,11 +455,7 @@ impl NegativeEdgeSearch {
     fn new() -> Self {
         Self()
     }
-    fn next<T: Debug>(
-        &mut self,
-        _graph: &DirectedGraph<T>,
-        data: &NetworkSimplexData,
-    ) -> Option<EdgeId> {
+    fn next<'a, 'b, T: Debug>(&mut self, data: &NetworkSimplexData<'a, 'b, T>) -> Option<EdgeId> {
         data.edges
             .iter()
             .filter(|(_, d)| d.in_tree && d.cut_value < 0)
@@ -486,14 +471,12 @@ impl NegativeEdgeSearch {
     }
 }
 
-fn find_replacement_edge<T: Debug>(
-    graph: &DirectedGraph<T>,
-    data: &NetworkSimplexData,
+fn find_replacement_edge<'a, 'b, T: Debug>(
+    data: &NetworkSimplexData<'a, 'b, T>,
     edge_id: EdgeId,
 ) -> EdgeId {
     struct S<'a, 'b, T: Debug> {
-        graph: &'a DirectedGraph<T>,
-        data: &'b NetworkSimplexData,
+        data: &'b NetworkSimplexData<'a, 'b, T>,
         direction: Direction,
         min_slack: u32,
         min_edge: EdgeId,
@@ -504,7 +487,8 @@ fn find_replacement_edge<T: Debug>(
     impl<'a, 'b, T: Debug> S<'a, 'b, T> {
         fn f(&mut self, node_id: NodeId, edge_id: EdgeId) -> &mut Self {
             // DSF substree for edge with min slack to the main tree
-            for (_, candidate_edge_id, edge, direction) in self.graph.iter_node_edges(node_id) {
+            for (_, candidate_edge_id, edge, direction) in self.data.graph.iter_node_edges(node_id)
+            {
                 if self.direction == direction
                     && !self
                         .data
@@ -534,7 +518,7 @@ fn find_replacement_edge<T: Debug>(
         }
     }
 
-    let edge = graph.edge(edge_id);
+    let edge = data.graph.edge(edge_id);
     let (direction, subtree_root) = if data.nodes.get(edge.to).max < data.nodes.get(edge.from).max {
         // edge to the subtree, neet to find from subtree
         (Direction::Output, edge.to)
@@ -544,7 +528,6 @@ fn find_replacement_edge<T: Debug>(
     };
     let node_data = data.nodes.get(subtree_root);
     S {
-        graph,
         data,
         direction,
         min_slack: u32::MAX,
@@ -556,10 +539,8 @@ fn find_replacement_edge<T: Debug>(
     .min_edge
 }
 
-fn replace_edge<T: Debug>(
-    graph: &DirectedGraph<T>,
-    data: &mut NetworkSimplexData,
-    ranks: &mut NodeMap<i32>,
+fn replace_edge<'a, 'b, T: Debug>(
+    data: &mut NetworkSimplexData<'a, 'b, T>,
     from_id: EdgeId,
     to_id: EdgeId,
 ) {
@@ -568,8 +549,8 @@ fn replace_edge<T: Debug>(
     from_edge_data.in_tree = false;
     from_edge_data.cut_value = 0;
     data.edges.get_mut(to_id).in_tree = true;
-    let from = graph.edge(from_id);
-    let to = graph.edge(to_id);
+    let from = data.graph.edge(from_id);
+    let to = data.graph.edge(to_id);
     data.nodes.get_mut(from.from).remove_output(from_id);
     data.nodes.get_mut(from.to).remove_input(from_id);
     data.nodes.get_mut(to.from).outputs.push(to_id);
@@ -577,23 +558,21 @@ fn replace_edge<T: Debug>(
 
     let slack = data.edges.get(to_id).slack(to) as i32;
     if slack > 0 {
-        shift(graph, data, ranks, from_id, slack)
+        shift(data, from_id, slack);
     }
     // TODO: possible to optimize, don't need to calculate for all
-    minmax(graph, &mut data.nodes);
-    cut_value(graph, data);
+    minmax(data);
+    cut_value(data);
 }
 
 // adds shift to edge length and adjust affected nodes of the subtree
 // TODO: always shift subtree but can be optimized to move part with min nodes count
-fn shift<T: Debug>(
-    graph: &DirectedGraph<T>,
-    data: &mut NetworkSimplexData,
-    ranks: &mut NodeMap<i32>,
+fn shift<'a, 'b, T: Debug>(
+    data: &mut NetworkSimplexData<'a, 'b, T>,
     start_edge_id: EdgeId,
     shift: i32,
 ) {
-    let start_edge = graph.edge(start_edge_id);
+    let start_edge = data.graph.edge(start_edge_id);
     let from = data.nodes.get(start_edge.from);
     let to = data.nodes.get(start_edge.to);
 
@@ -605,7 +584,7 @@ fn shift<T: Debug>(
         (from.min, from.max, start_edge.from, start_edge.to)
     };
 
-    let node_shift = if ranks.get(sub_root) > ranks.get(other) {
+    let node_shift = if data.ranks.get(sub_root) > data.ranks.get(other) {
         shift //move subtree down
     } else {
         -shift // up
@@ -617,11 +596,11 @@ fn shift<T: Debug>(
 
     for (node_id, node_data) in data.nodes.iter() {
         if node_data.inside(min, max) {
-            *ranks.get_mut(node_id) += node_shift;
-            for edge_id in graph.node(node_id).edges() {
-                let edge = graph.edge(edge_id);
+            *data.ranks.get_mut(node_id) += node_shift;
+            for edge_id in data.graph.node(node_id).edges() {
+                let edge = data.graph.edge(edge_id);
                 data.edges.get_mut(edge_id).length =
-                    (ranks.get(edge.to) - ranks.get(edge.from)) as u32;
+                    (data.ranks.get(edge.to) - data.ranks.get(edge.from)) as u32;
             }
         }
     }
@@ -676,6 +655,34 @@ fn _validate_length<T: Debug>(
 ) {
 }
 
+fn dump_graph<'a, 'b, T>(
+    data: &NetworkSimplexData<'a, 'b, T>,
+    iter: u32,
+    place: &str,
+    special_edge: Option<EdgeId>,
+) {
+    data.graph.dump(
+        &format!(
+            "tmp_ns_{place}_replacement_{:?}_{iter}.dot",
+            data.postprocess,
+        ),
+        &|_, id, _| format!("{:?} r:{}", id, data.ranks.get(id)).into(),
+        &|_, id, edge| {
+            format!(
+                "cut:{} slack:{} len:{} weight:{}{}",
+                data.edges.get(id).cut_value,
+                data.edges.get(id).slack(edge),
+                data.edges.get(id).length,
+                edge.weight,
+                if special_edge == Some(id) { "*" } else { "" },
+            )
+            .into()
+        },
+        &|_, _| true,
+        &|_, id| data.edges.get(id).in_tree,
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -728,14 +735,14 @@ mod tests {
         ranks.set(NodeId::from(3u32), 16);
         dag.edge_mut(EdgeId::from(1u32)).min_length = 2;
         dag.edge_mut(EdgeId::from(2u32)).min_length = 3;
-        let data = span_tree(&mut dag, &mut ranks);
-        normalize(&mut ranks);
+        let data = span_tree(&mut dag, Postprocess::None, &mut ranks);
+        normalize(data.ranks);
         let tree_edges_count: usize = dbg!(&data.nodes)
             .iter()
             .map(|(_, n)| n.inputs.len() + n.outputs.len())
             .sum();
-        assert_eq!(tree_edges_count / 2, dag.nodes_count() as usize - 1);
-        assert_ranks(&ranks, &[0, 1, 3, 6]);
+        assert_eq!(tree_edges_count / 2, data.graph.nodes_count() as usize - 1);
+        assert_ranks(data.ranks, &[0, 1, 3, 6]);
         assert_eq!(
             (1 + 2 + 3) as u32,
             data.edges.iter().map(|(_, d)| d.length).sum(),
@@ -761,12 +768,12 @@ mod tests {
         ranks.set(NodeId::from(1u32), 1);
         ranks.set(NodeId::from(2u32), 1);
         ranks.set(NodeId::from(3u32), 2);
-        let data = span_tree(&mut dag, &mut ranks);
+        let data = span_tree(&mut dag, Postprocess::None, &mut ranks);
         let tree_edges_count: usize = dbg!(&data.nodes)
             .iter()
             .map(|(_, n)| n.inputs.len() + n.outputs.len())
             .sum();
-        assert_eq!(tree_edges_count / 2, dag.nodes_count() as usize - 1);
+        assert_eq!(tree_edges_count / 2, data.graph.nodes_count() as usize - 1);
         assert_eq!(
             data.edges.iter().filter(|(_, e)| e.in_tree).count(),
             dag.nodes_count() as usize - 1
@@ -795,14 +802,14 @@ mod tests {
         );
         let mut ranks = rank(&mut dag);
         dbg!(&ranks.iter().collect::<Vec<_>>());
-        let mut data = span_tree(&mut dag, &mut ranks);
+        let mut data = span_tree(&mut dag, Postprocess::None, &mut ranks);
         let tree_edges_count: usize = dbg!(&data.nodes)
             .iter()
             .map(|(_, n)| n.inputs.len() + n.outputs.len())
             .sum();
-        minmax(&dag, &mut data.nodes);
+        minmax(&mut data);
         dbg!(&data.nodes);
-        cut_value(&dag, &mut data);
+        cut_value(&mut data);
         dbg!(&data.edges);
         assert_eq!(tree_edges_count / 2, dag.nodes_count() as usize - 1);
     }
@@ -821,8 +828,8 @@ mod tests {
             &[('a', 'b'), ('b', 'c'), ('b', 'd'), ('a', 'e')],
         );
         let mut ranks = rank(&mut dag);
-        let mut data = span_tree(&mut dag, &mut ranks);
-        minmax(&dag, &mut data.nodes);
+        let mut data = span_tree(&mut dag, Postprocess::None, &mut ranks);
+        minmax(&mut data);
         assert_eq!(data.nodes.get(NodeId::from(0u32)).min, 1);
         assert_eq!(data.nodes.get(NodeId::from(1u32)).min, 1);
         assert_eq!(data.nodes.get(NodeId::from(2u32)).min, 1);
@@ -853,9 +860,9 @@ mod tests {
         dag.edge_mut(EdgeId::from(6u32)).weight = 0;
         dag.edge_mut(EdgeId::from(7u32)).weight = 0;
         let mut ranks = rank(&mut dag);
-        let mut data = span_tree(&mut dag, &mut ranks);
-        minmax(&dag, &mut data.nodes);
-        cut_value(&dag, &mut data);
+        let mut data = span_tree(&mut dag, Postprocess::None, &mut ranks);
+        minmax(&mut data);
+        cut_value(&mut data);
         dbg!(&data);
 
         assert_eq!(data.edges.get(EdgeId::from(0u32)).cut_value, 2);
@@ -867,11 +874,11 @@ mod tests {
         assert_eq!(data.edges.get(EdgeId::from(6u32)).cut_value, 2);
         assert_eq!(data.edges.get(EdgeId::from(7u32)).cut_value, 1);
 
-        let negatove_edge = dbg!(NegativeEdgeSearch::new().next(&dag, &data)).unwrap();
-        let replacement_edge = find_replacement_edge(&dag, &data, negatove_edge);
+        let negatove_edge = dbg!(NegativeEdgeSearch::new().next(&data)).unwrap();
+        let replacement_edge = find_replacement_edge(&mut data, negatove_edge);
         dbg!(&negatove_edge, replacement_edge);
-        replace_edge(&dag, &mut data, &mut ranks, negatove_edge, replacement_edge);
-        dbg!(&data, &ranks);
+        replace_edge(&mut data, negatove_edge, replacement_edge);
+        dbg!(&data, &data.ranks);
 
         assert_eq!(data.edges.get(EdgeId::from(0u32)).cut_value, 2);
         assert_eq!(data.edges.get(EdgeId::from(1u32)).cut_value, 0);
@@ -882,7 +889,7 @@ mod tests {
         assert_eq!(data.edges.get(EdgeId::from(6u32)).cut_value, 1);
         assert_eq!(data.edges.get(EdgeId::from(7u32)).cut_value, 1);
 
-        let negatove_edge = dbg!(NegativeEdgeSearch::new().next(&dag, &data));
+        let negatove_edge = dbg!(NegativeEdgeSearch::new().next(&data));
 
         assert!(negatove_edge.is_none())
     }
