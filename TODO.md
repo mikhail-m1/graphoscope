@@ -1,6 +1,7 @@
 # TODO
 
 ## high priority bug
+* repeated links
 * check why right and right_explicit return different result, it's in place.rs
 
 ## graph

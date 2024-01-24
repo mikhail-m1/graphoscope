@@ -3,3 +3,4 @@
 /wasm-pack.log
 Cargo.lock
 .vscode
+tmp_*.dot

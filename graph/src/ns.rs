@@ -33,7 +33,7 @@ pub fn network_simplex<T: Debug>(
     let mut iter = 0;
     let mut negative_edge_search = NegativeEdgeSearch::new();
     while let Some(negative_edge) = negative_edge_search.next(&data) {
-        dump_graph(&data, iter, "replace_before", Some(negative_edge));
+        dump_graph(&data, iter, "replace_ready", Some(negative_edge));
         debug!(
             "search replacment for {:?} {:?}",
             negative_edge,
@@ -51,7 +51,7 @@ pub fn network_simplex<T: Debug>(
         iter += 1;
     }
 
-    normalize(data.ranks);
+    normalize(data.ranks); // TODO: optimize, we can do it once
     debug!("before post process ranks: {:?}", data.ranks);
 
     if postprocess == Postprocess::Center {
@@ -67,12 +67,19 @@ pub fn network_simplex<T: Debug>(
                 .get(replacement_edge)
                 .slack(graph.edge(replacement_edge))
                 / 2) as i32;
+            debug!(
+                "center balance {:?} {:?} & {:?} {:?} shift {shift_}",
+                edge_id,
+                graph.edge(edge_id),
+                replacement_edge,
+                graph.edge(replacement_edge)
+            );
             if shift_ != 0 {
-                debug!("shift {:?} {:?} {}", edge_id, graph.edge(edge_id), shift_);
                 shift(&mut data, edge_id, shift_);
             }
         }
     }
+    normalize(data.ranks);
     debug!("after post process ranks: {:?}", data.ranks);
     dump_graph(data, 0, "ns_done", None);
     ranks
@@ -662,10 +669,7 @@ fn dump_graph<'a, 'b, T>(
     special_edge: Option<EdgeId>,
 ) {
     data.graph.dump(
-        &format!(
-            "tmp_ns_{place}_replacement_{:?}_{iter}.dot",
-            data.postprocess,
-        ),
+        &format!("tmp_ns_{:?}_{place}_{iter}.dot", data.postprocess,),
         &|_, id, _| format!("{:?} r:{}", id, data.ranks.get(id)).into(),
         &|_, id, edge| {
             format!(
@@ -674,7 +678,7 @@ fn dump_graph<'a, 'b, T>(
                 data.edges.get(id).slack(edge),
                 data.edges.get(id).length,
                 edge.weight,
-                if special_edge == Some(id) { "*" } else { "" },
+                if special_edge == Some(id) { " *" } else { "" },
             )
             .into()
         },

@@ -61,3 +61,44 @@ fn check(input_name: &str, output_name: &str) -> Result<(), std::io::Error> {
     assert!(expected == output);
     Ok(())
 }
+
+//#[test]
+fn compare_graphs() {
+    let mut data = String::new();
+    File::open("../dot_files/aim_min_ambiguty.dot")
+        .expect("input file")
+        .read_to_string(&mut data)
+        .unwrap();
+
+    let mut dot = read_dot::parse(&data).expect("parse error");
+    to_dag::to_dag(&mut dot.graph);
+    let mut ranks = graph::rank_with_components(&dot.graph);
+    graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
+    let _places = graph::place::places3(&dot.graph, &ranks);
+    let old = &dot.graph; // Change this to compare different graphs
+    let new = &dot.graph;
+
+    assert_eq!(old.nodes_count(), new.nodes_count());
+    assert_eq!(old.edges_count(), new.edges_count());
+
+    for (id, node) in old.iter_nodes_with_id() {
+        assert_eq!(
+            node.inputs
+                .iter()
+                .map(|&e| (e, old.edge(e).to))
+                .collect::<Vec<_>>(),
+            new.node(id)
+                .inputs
+                .iter()
+                .map(|&e| (e, old.edge(e).to))
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(node.inputs, new.node(id).inputs, "for node {id:?} inputs");
+        assert_eq!(
+            node.outputs,
+            new.node(id).outputs,
+            "for node {id:?} outputs"
+        );
+    }
+}

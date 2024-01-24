@@ -533,7 +533,7 @@ impl From<usize> for EdgeId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct NodeMap<T> {
     values: Vec<T>,
 }

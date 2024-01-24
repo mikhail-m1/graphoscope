@@ -6,39 +6,14 @@ pub fn x_coordinates<T: Debug>(
     ranks: &NodeMap<i32>,
     places: &NodeMap<u32>,
 ) -> NodeMap<u32> {
+    let node_width = 50;
     let mut temp_graph = DirectedGraph::<()>::new(&[], &[]);
-    for _ in 0..graph.nodes_count() {
-        temp_graph.add_node(Node::virt());
-    }
+    debug!("x_coord: Input graph has {} nodes", graph.nodes_count());
 
-    // TODO: use for each edge?
-    for (node_id, _) in graph.iter_nodes_with_id() {
-        for child_id in graph.iter_children(node_id) {
-            let temp_node_id = temp_graph.add_node(Node::virt());
-            let edge_id = temp_graph.add_edge(Edge {
-                from: temp_node_id,
-                to: node_id,
-                kind: EdgeKind::Normal,
-                min_length: 1,
-                weight: 1,
-            });
-            temp_graph.node_mut(temp_node_id).outputs.push(edge_id);
-            temp_graph.node_mut(node_id).inputs.push(edge_id);
+    // Each edge will be replaced by node and two edges.
+    let mut left_right_ranks = NodeMap::new(graph.nodes_count() + graph.edges_count());
 
-            let edge_id = temp_graph.add_edge(Edge {
-                from: temp_node_id,
-                to: child_id,
-                kind: EdgeKind::Normal,
-                min_length: 1,
-                weight: 1,
-            });
-            temp_graph.node_mut(temp_node_id).outputs.push(edge_id);
-            temp_graph.node_mut(child_id).inputs.push(edge_id);
-            temp_graph.add_root(temp_node_id);
-        }
-    }
-
-    //TODO: maybe pass layers?
+    //TODO: pass layers
     let mut layers = vec![];
     for (id, _) in graph.iter_nodes_with_id() {
         let rank = *ranks.get(id) as usize;
@@ -53,15 +28,21 @@ pub fn x_coordinates<T: Debug>(
         layer[place] = Some(id)
     }
 
+    for _ in 0..graph.nodes_count() {
+        temp_graph.add_node(Node::virt()); //TODO: rewrite to real node
+    }
+
+    // Links nodes on the same level.
     for layer in &layers {
-        let mut iter = layer.iter().filter_map(|v| *v).peekable();
-        while let Some(id) = iter.next() {
-            if let Some(&next) = iter.peek() {
+        let mut iter = layer.iter().filter_map(|v| *v).enumerate().peekable();
+        while let Some((index, id)) = iter.next() {
+            left_right_ranks.set(id, index as i32 * node_width as i32);
+            if let Some(&(_, next)) = iter.peek() {
                 let edge_id = temp_graph.add_edge(Edge {
                     from: id,
                     to: next,
                     kind: EdgeKind::Normal,
-                    min_length: 50,
+                    min_length: node_width, // TODO: use real node width
                     weight: 0,
                 });
                 temp_graph.node_mut(id).outputs.push(edge_id);
@@ -70,8 +51,57 @@ pub fn x_coordinates<T: Debug>(
         }
     }
 
-    //TODO: need to make additional tweaks to center clusters with slack
-    let coordinates = network_simplex(&temp_graph, crate::ns::Postprocess::Center, None);
+    // Create auxiliary nodes and edges to replace input edges.
+    for edge in graph.iter_edges() {
+        let temp_node_id = temp_graph.add_node(Node::virt());
+        debug!(
+            "x_coord: add node {temp_node_id:?} for edge {:?} {:?} {:?}",
+            edge,
+            graph.original_id(edge.from),
+            graph.original_id(edge.to)
+        );
+        let edge_id = temp_graph.add_edge(Edge {
+            from: temp_node_id,
+            to: edge.from,
+            kind: EdgeKind::Normal,
+            min_length: 1,
+            weight: edge.weight,
+        });
+        temp_graph.node_mut(temp_node_id).outputs.push(edge_id);
+        temp_graph.node_mut(edge.from).inputs.push(edge_id);
+
+        let edge_id = temp_graph.add_edge(Edge {
+            from: temp_node_id,
+            to: edge.to,
+            kind: EdgeKind::Normal,
+            min_length: 1,
+            weight: edge.weight,
+        });
+        temp_graph.node_mut(temp_node_id).outputs.push(edge_id);
+        temp_graph.node_mut(edge.to).inputs.push(edge_id);
+        debug!(
+            "check for root, left {}, right {}, min {}",
+            ranks.get(edge.from),
+            ranks.get(edge.to),
+            *ranks.get(edge.from).min(ranks.get(edge.to))
+        );
+
+        let min_rank = *left_right_ranks
+            .get(edge.from)
+            .min(left_right_ranks.get(edge.to));
+        left_right_ranks.set(temp_node_id, min_rank - 1);
+        if min_rank == 0 {
+            // TODO: check how it affects ns, previously all auxiliary nodes were added.
+            debug!("add root: {:?}", temp_node_id);
+            temp_graph.add_root(temp_node_id);
+        }
+    }
+
+    let coordinates = network_simplex(
+        &temp_graph,
+        crate::ns::Postprocess::Center,
+        Some(left_right_ranks),
+    );
 
     //TODO: maybe just return coordinates or downsize it?
     let mut result = graph.node_map();
