@@ -197,7 +197,7 @@ impl<T> DirectedGraph<T> {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn dump<NodeFilter, EdgeFilter, NodeFormater, EdgeFormater>(
         &self,
-        filename: &str,
+        filename_prefix: &str,
         node_formater: &NodeFormater,
         edge_formater: &EdgeFormater,
         node_filter: &NodeFilter,
@@ -208,11 +208,11 @@ impl<T> DirectedGraph<T> {
         NodeFilter: Fn(&DirectedGraph<T>, NodeId) -> bool,
         EdgeFilter: Fn(&DirectedGraph<T>, EdgeId) -> bool,
     {
-        if env::var("GS_DUMP_STEPS").is_err() {
+        let Ok(ending) = env::var("GS_DUMP_STEPS") else {
             return;
-        }
+        };
 
-        let mut file = File::create(filename).unwrap();
+        let mut file = File::create(&format!("{filename_prefix}_{ending}.dot")).unwrap();
         let mut buf = "digraph temp {".to_string();
 
         for (id, node) in self
@@ -547,7 +547,7 @@ impl<T: Debug> Debug for DirectedGraph<T> {
         struct NodeFmt<'a, T: Debug>(&'a Node, &'a DirectedGraph<T>, NodeId);
         impl<'a, T: Debug> Debug for NodeFmt<'a, T> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut m = f.debug_struct("");
+                let mut m = f.debug_struct(&format!("{:?}", self.2));
                 if !self.0.inputs.is_empty() {
                     m.field("i", &NodeLinksFmt(self.1, self.2, Direction::Input));
                 }
@@ -561,11 +561,11 @@ impl<T: Debug> Debug for DirectedGraph<T> {
         struct NodesFmt<'a, T: Debug>(&'a DirectedGraph<T>);
         impl<'a, T: Debug> Debug for NodesFmt<'a, T> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.debug_map()
+                f.debug_list()
                     .entries(
                         self.0
                             .iter_nodes_with_id()
-                            .map(|(id, node)| (NodeId(id.0), NodeFmt(node, self.0, id))),
+                            .map(|(id, node)| NodeFmt(node, self.0, id)),
                     )
                     .finish()
             }

@@ -16,7 +16,7 @@ pub fn network_simplex<T: Debug>(
     let mut ranks = opt_ranks.unwrap_or(rank(&graph));
     debug!("initial ranks: {ranks:?}");
     graph.dump(
-        &format!("tmp_ns_before_start_{postprocess:?}.dot"),
+        &format!("tmp_ns_before_start_{postprocess:?}"),
         &|_, id, _| format!("{:?} r:{}", id, ranks.get(id)).into(),
         &|_, _, edge| format!("weight:{} min_len:{}", edge.weight, edge.min_length,).into(),
         &|_, _| true,
@@ -241,7 +241,7 @@ fn span_tree<'a, 'b, T: Debug>(
     //merge trees
     while current_tree != 1 {
         graph.dump(
-            &format!("tmp_span_tree_join_{current_tree}.dot"),
+            &format!("tmp_span_tree_join_{current_tree}"),
             &|_, id, _| format!("{:?} T:{} r:{}", id, tree.get(id), ranks.get(id)).to_string(),
             &|_, _, _| "".into(),
             &|_, _| true,
@@ -669,7 +669,7 @@ fn dump_graph<'a, 'b, T>(
     special_edge: Option<EdgeId>,
 ) {
     data.graph.dump(
-        &format!("tmp_ns_{:?}_{place}_{iter}.dot", data.postprocess,),
+        &format!("tmp_ns_{:?}_{place}_{iter}", data.postprocess,),
         &|_, id, _| format!("{:?} r:{}", id, data.ranks.get(id)).into(),
         &|_, id, edge| {
             format!(
