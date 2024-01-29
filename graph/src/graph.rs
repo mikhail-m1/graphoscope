@@ -147,7 +147,18 @@ impl<T> DirectedGraph<T> {
         self.edges
             .iter()
             .enumerate()
-            .map(|(n, node)| (EdgeId::from(n), node))
+            .map(|(n, edge)| (EdgeId::from(n), edge))
+    }
+
+    pub fn iter_edges_with_last(&self, last: Option<EdgeId>) -> impl Iterator<Item = EdgeId> {
+        let start = if let Some(last_id) = last {
+            last_id.0 + 1
+        } else {
+            0
+        };
+        (start..self.edges_count())
+            .chain(0..start)
+            .map(move |i| EdgeId::from(i))
     }
 
     pub fn iter_edges(&self) -> impl Iterator<Item = &Edge> {

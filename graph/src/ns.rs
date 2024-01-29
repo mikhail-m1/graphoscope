@@ -456,25 +456,24 @@ fn cut_value<'a, 'b, T: Debug>(data: &mut NetworkSimplexData<'a, 'b, T>) {
     );
 }
 
-struct NegativeEdgeSearch();
+struct NegativeEdgeSearch {
+    last: Option<EdgeId>,
+}
 
 impl NegativeEdgeSearch {
     fn new() -> Self {
-        Self()
+        Self { last: None }
     }
     fn next<'a, 'b, T: Debug>(&mut self, data: &NetworkSimplexData<'a, 'b, T>) -> Option<EdgeId> {
-        data.edges
-            .iter()
+        self.last = data
+            .graph
+            .iter_edges_with_last(self.last)
+            // .take(30) // TODO: create constant
+            .map(|id| (id, data.edges.get(id)))
             .filter(|(_, d)| d.in_tree && d.cut_value < 0)
             .min_by(|(_, d1), (_, d2)| d1.cut_value.cmp(&d2.cut_value))
-            .map(|(id, _)| id)
-        // TODO rewrite, start from last point, scan limited negative nodes (30?)
-        /*
-        for (edge_id,_) in data.edges.iter().filter(|(_, d)| d.in_tree && d.cut_value < 0) {
-            dbg!(edge_id);
-        }
-        None
-        */
+            .map(|(id, _)| id);
+        self.last
     }
 }
 

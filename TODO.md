@@ -8,7 +8,6 @@
 * make graph api consistent, migrate loops to it
 * ns: remove length?
 * ns: unify shift
-* ns: state for negative graph search
 * pass layers between functions
 * rewrite code for lines in draw
 * calculate nodes size base on text, trim 
