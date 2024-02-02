@@ -47,7 +47,7 @@ pub fn split_components<T: Debug>(
     graph: &DirectedGraph<T>,
 ) -> (Vec<DirectedGraph<()>>, NodeMap<NewNodePlace>) {
     debug!(
-        "split_components() for DAG with {} nodes",
+        "split_components: for DAG with {} nodes",
         graph.nodes_count()
     );
 
@@ -81,6 +81,9 @@ pub fn split_components<T: Debug>(
             let NewNodePlace { new_id, component } = self.map.get(edge.from);
             let component = &mut self.components[*component as usize];
             let new_to = self.map.get(edge.to).new_id;
+            debug!(
+                "split_components: copy edge {edge:?} as {new_id:?} -> {new_to:?} to {component:?}"
+            );
             let edge_id = component.add_edge(Edge {
                 from: *new_id,
                 to: new_to,
@@ -104,22 +107,22 @@ pub fn split_components<T: Debug>(
         if *s.visited.get(id) {
             continue;
         }
-        queue.push(id);
         s.current += 1;
+        debug!("split_components: start component {}", s.current - 1);
         s.components.push(DirectedGraph::default());
+        queue.push(id);
         s.copy_node(id);
 
         // for all outputs and inputs add reachabe nodes to current component
         while let Some(id) = queue.pop() {
-            debug!("pop {:?}", id);
+            debug!("split_components: pop {:?}", id);
             let node = graph.node(id);
             for &edge_id in &node.outputs {
                 let edge = graph.edge(edge_id);
                 if *s.visited.get(edge.to) {
-                    s.copy_edge(edge);
                     continue;
                 }
-                debug!("add {:?}", edge);
+                debug!("split_components: add {:?}", edge);
                 queue.push(edge.to);
                 s.copy_node(edge.to);
             }
@@ -127,10 +130,9 @@ pub fn split_components<T: Debug>(
             for &edge_id in &node.inputs {
                 let edge = graph.edge(edge_id);
                 if *s.visited.get(edge.from) {
-                    s.copy_edge(edge);
                     continue;
                 }
-                debug!("add {:?}", edge);
+                debug!("split_components: add {:?}", edge);
                 queue.push(edge.from);
                 s.copy_node(edge.from);
             }
@@ -140,11 +142,13 @@ pub fn split_components<T: Debug>(
     for edge in graph.iter_edges() {
         s.copy_edge(edge);
     }
+    // No need to copy self edge becase those doesn't affect Y position.
 
-    debug!("{:?}", graph);
-    debug!("{:?}", s.map);
+    debug!("split_components: {:?}", graph);
+    debug!("split_components: {:?}", s.map);
+    debug!("split_components: {:?}", s.components);
 
-    assert_ne!(
+    assert_eq!(
         graph.edges_count(),
         s.components.iter().map(|c| c.edges_count()).sum(),
     );
@@ -180,6 +184,7 @@ mod tests {
 
     #[test]
     fn split_components_test() {
+        init_log();
         let graph = DirectedGraph::new(&[0], &[(1, 2), (3, 2), (4, 4), (5, 4), (5, 6), (6, 4)]);
         let (components, map) = split_components(&graph);
         assert_eq!(components.len(), 3);

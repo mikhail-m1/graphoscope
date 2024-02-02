@@ -4,6 +4,9 @@ use std::fmt::Debug;
 pub fn add_virtual_nodes<T: Debug>(graph: &mut DirectedGraph<T>, ranks: &mut NodeMap<i32>) {
     graph.for_each_edge_mut(&mut |graph, mut edge_id| {
         let edge = graph.edge(edge_id);
+        if edge.from == edge.to {
+            return;
+        }
         let is_inverted = edge.kind == EdgeKind::Inverted;
         let from_id = edge.from;
         let to_id = edge.to;

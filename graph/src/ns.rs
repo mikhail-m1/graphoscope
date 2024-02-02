@@ -615,7 +615,7 @@ fn shift<'a, 'b, T: Debug>(
 #[cfg(debug_assertions)]
 fn _validate_rank<T: Debug>(graph: &DirectedGraph<T>, ranks: &NodeMap<i32>) {
     for (_, edge) in graph.iter_edges_with_id() {
-        if ranks.get(edge.to) - ranks.get(edge.from) < 1 {
+        if edge.to != edge.from && ranks.get(edge.to) - ranks.get(edge.from) < 1 {
             panic!(
                 "rank validate failed, {:?}:{:?}:{} to {:?}:{:?}:{}",
                 edge.from,

@@ -1,7 +1,6 @@
 # TODO
 
 ## high priority bug
-* repeated links
 * check why right and right_explicit return different result, it's in place.rs
 
 ## graph
@@ -9,7 +8,7 @@
 * ns: remove length?
 * ns: unify shift
 * pass layers between functions
-* rewrite code for lines in draw
+* rewrite code for lines in draw?
 * calculate nodes size base on text, trim 
 * same level edges, self edges, back edges, duplicated edges
 * implement search for layer with min nodes in ns top bottom 

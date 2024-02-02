@@ -63,7 +63,7 @@ fn check(input_name: &str, output_name: &str) -> Result<(), std::io::Error> {
 }
 
 //#[test]
-fn compare_graphs() {
+fn _compare_graphs() {
     let mut data = String::new();
     File::open("../dot_files/aim_min_ambiguty.dot")
         .expect("input file")

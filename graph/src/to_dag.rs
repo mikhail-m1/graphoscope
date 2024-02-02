@@ -25,7 +25,7 @@ pub fn to_dag<T: Debug>(graph: &mut DirectedGraph<T>) {
 
     while visited_count != graph.nodes_count() {
         if stack.is_empty() {
-            // convert first unvisited node to the root by reveting all input edges
+            // converts first unvisited node to the root by reverting all input edges
             let first_unvisited = visited.find_first(|v| !v).unwrap();
             stack.push(Action::EnterToRoot(first_unvisited));
             let first_node = graph.node_mut(first_unvisited);

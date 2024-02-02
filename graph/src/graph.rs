@@ -10,8 +10,8 @@ impl<T: Eq + Debug + Clone> DirectedGraph<T> {
     pub fn new(input_nodes: &[T], input_edges: &[(T, T)]) -> Self {
         let mut original_node_ids: Vec<_> = Vec::from(input_nodes);
         let mut nodes = vec![Node::default(); input_nodes.len()];
-
         let mut edges = Vec::with_capacity(input_edges.len());
+        let mut self_edges = Vec::new();
 
         for (from_id, to_id) in input_edges {
             let from = original_node_ids
@@ -38,11 +38,15 @@ impl<T: Eq + Debug + Clone> DirectedGraph<T> {
                 })
                 .into();
 
-            edges.push(Edge::new(from, to));
-            let edge_id = edges.len() - 1;
+            if from == to {
+                self_edges.push(from);
+            } else {
+                edges.push(Edge::new(from, to));
+                let edge_id = edges.len() - 1;
 
-            nodes[from.0 as usize].outputs.push(edge_id.into());
-            nodes[to.0 as usize].inputs.push(edge_id.into());
+                nodes[from.0 as usize].outputs.push(edge_id.into());
+                nodes[to.0 as usize].inputs.push(edge_id.into());
+            }
         }
 
         Self {
@@ -55,6 +59,7 @@ impl<T: Eq + Debug + Clone> DirectedGraph<T> {
             nodes,
             edges,
             original_node_ids,
+            self_edges,
         }
     }
 }
@@ -163,6 +168,10 @@ impl<T> DirectedGraph<T> {
 
     pub fn iter_edges(&self) -> impl Iterator<Item = &Edge> {
         self.edges.iter()
+    }
+
+    pub fn iter_self_edges(&self) -> impl Iterator<Item = &NodeId> {
+        self.self_edges.iter()
     }
 
     pub fn for_each_edge_mut<F>(&mut self, f: &mut F)
@@ -482,6 +491,7 @@ pub struct DirectedGraph<T> {
     nodes: Vec<Node>,
     edges: Vec<Edge>,
     original_node_ids: Vec<T>,
+    self_edges: Vec<NodeId>,
 }
 
 #[derive(Default, Clone)]
@@ -607,6 +617,7 @@ impl<T: Debug> Debug for DirectedGraph<T> {
             .field("roots", &self.roots)
             .field("\nnodes", &NodesFmt(self))
             .field("\nedges", &self.edges)
+            .field("\nself_edges", &self.self_edges)
             .finish()
     }
 }
@@ -628,7 +639,10 @@ impl Debug for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut m = f.debug_struct(&format!(
             "{}{:?}->{:?}",
-            if self.is_inverted() { "inv" } else { "" },
+            match self.kind {
+                EdgeKind::Normal => "",
+                EdgeKind::Inverted => "inv",
+            },
             self.from,
             self.to
         ));
