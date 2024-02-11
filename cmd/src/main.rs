@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate log;
-use graph::{read_dot, to_dag};
+use graph::{generator, read_dot, to_dag};
 extern crate simplelog;
 use std::{env::args, fs::File, io::Read, str};
 
@@ -15,9 +15,19 @@ fn main() {
         error!("pass a dot file");
         return;
     }
-    let mut file = File::open(args().last().unwrap()).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
+    let data = if args().len() == 1 {
+        let mut file = File::open(args().last().unwrap()).unwrap();
+        let mut data = String::new();
+        file.read_to_string(&mut data).unwrap();
+        data
+    } else {
+        let mut args = args();
+        args.next();
+        generator::random(
+            args.next().unwrap().parse().unwrap(),
+            args.next().unwrap().parse().unwrap(),
+        )
+    };
 
     let mut dot = read_dot::parse(&data).expect("parse error");
     to_dag::to_dag(&mut dot.graph);

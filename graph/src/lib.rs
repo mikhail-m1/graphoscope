@@ -11,6 +11,7 @@ pub mod place;
 pub mod read_dot;
 pub mod to_dag;
 pub mod xcoord;
+pub mod generator;
 extern crate pest;
 extern crate pest_derive;
 
