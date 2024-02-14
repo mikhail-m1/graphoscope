@@ -1,7 +1,9 @@
 # TODO
 ## big graph support in web
-* check size (nodes count and nodes/edges ratio) 50/250 100/250 200/250 300/400
+* add search
+* add generator to web
 * fix generate to connect all nodes to something first
+* check size (nodes count and nodes/edges ratio) 50/250 100/250 200/250 300/400
 * draw root (or roots)? only with n steps
 * draw n steps from new selected node 
 * check graph when one node connected to all (another generator)
