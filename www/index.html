@@ -5,24 +5,7 @@
   <meta charset="UTF-8">
   <title>Graphoscope</title>
   <script src="./bootstrap.js"></script>
-  <script>
-    var lastId = undefined;
-    var lastColor;
-    function outputClickHandler(id) {
-      if (lastId) {
-        document.getElementById(lastId).setAttribute('fill', lastColor);
-      }
-      const item = document.getElementById(id);
-      lastColor = item.getAttribute('fill')
-      lastId = id;
-      item.setAttribute('fill', 'green')
-    }
-
-    function visualize(data) {
-      document.getElementById("input").value = 'digraph g {' + data + '}'
-      document.getElementById("update").click()
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.5.0/dist/svg-pan-zoom.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yegor256/tacit@gh-pages/tacit-css-1.5.5.min.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -36,8 +19,12 @@
 
       #output {
         display: flex;
-        height: 100%;
       }
+    }
+
+    #output>svg {
+      width: 100%;
+      height: 100vh;
     }
   </style>
 </head>
@@ -76,9 +63,7 @@
           </ul>
         </div>
       </div>
-
-      <div id="output" style="height: 1000px" />
-
+      <article id="output" />
     </div>
   </div>
 </body>

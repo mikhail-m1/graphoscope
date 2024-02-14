@@ -18,13 +18,34 @@ function handleFiles() {
     reader.readAsText(this.files[0]);
 }
 
-document.getElementById("update").onclick = (function () {
+document.getElementById("update").onclick = function () {
     context = wasm.parse(document.getElementById("input").value);
     document.getElementById("output").innerHTML = context.render();
-})
+    svgPanZoom(output.childNodes[0]);
+}
 
-document.getElementById("input").addEventListener('keydown', function (e) {
-    if (e.code == "Enter" && (e.ctrlKey || e.metaKey)) {
-        document.getElementById("update").click()
+var lastId = undefined;
+var lastColor;
+function outputClickHandler(id) {
+    if (lastId) {
+        document.getElementById(lastId).setAttribute('fill', lastColor);
     }
-});
+    const item = document.getElementById(id);
+    lastColor = item.getAttribute('fill')
+    lastId = id;
+    item.setAttribute('fill', 'green')
+}
+
+function visualize(data) {
+    document.getElementById("input").value = 'digraph g {' + data + '}'
+    document.getElementById("update").click()
+}
+
+// export functions
+document.visualize = visualize;
+document.outputClickHandler = outputClickHandler;
+
+// create graph we have input (nice for page reload)
+if (document.getElementById('input').value.length != 0) {
+    document.getElementById('update').click();
+}
