@@ -1,27 +1,35 @@
 import * as wasm from "../binding/pkg/binding.js";
 
-const inputElement = document.getElementById("browse");
-inputElement.addEventListener("change", handleFiles, false);
+document.getElementById("browse").addEventListener("change", handleFiles, false);
 
 var context = undefined;
+const update_button = document.getElementById("update");
+const input = document.getElementById('input');
+const output = document.getElementById("output");
+const generate_button = document.getElementById("generate");
 
 function handleFiles() {
-    //console.log(this.files); /* now you can work with the file list */
     const reader = new FileReader();
     reader.onload = (function (x) {
-        // console.log(x.target.result);
-        document.getElementById("input").value = x.target.result;
-        context = wasm.parse(x.target.result);
-        // console.log(context.node_count())
-        document.getElementById("output").innerHTML = context.render();
+        input.value = x.target.result;
+        update_button.click();
     });
     reader.readAsText(this.files[0]);
 }
 
-document.getElementById("update").onclick = function () {
-    context = wasm.parse(document.getElementById("input").value);
-    document.getElementById("output").innerHTML = context.render();
+update_button.onclick = function () {
+    context = wasm.parse(input.value);
+    output.innerHTML = context.render();
     svgPanZoom(output.childNodes[0]);
+}
+
+generate_button.onclick = function () {
+    const nodes_count = document.getElementById("nodes_count");
+    nodes_count.value = Math.min(nodes_count.value, nodes_count.max);
+    const edges_count = document.getElementById("edges_count");
+    edges_count.value = Math.min(edges_count.value, edges_count.max);
+    input.value = wasm.render_random(nodes_count.value, edges_count.value);
+    document.getElementById('update').click();
 }
 
 var lastId = undefined;
@@ -37,8 +45,8 @@ function outputClickHandler(id) {
 }
 
 function visualize(data) {
-    document.getElementById("input").value = 'digraph g {' + data + '}'
-    document.getElementById("update").click()
+    input.value = 'digraph g {' + data + '}'
+    update_button.click()
 }
 
 // export functions
@@ -46,6 +54,6 @@ document.visualize = visualize;
 document.outputClickHandler = outputClickHandler;
 
 // create graph we have input (nice for page reload)
-if (document.getElementById('input').value.length != 0) {
-    document.getElementById('update').click();
+if (input.value.length != 0) {
+    update_button.click();
 }

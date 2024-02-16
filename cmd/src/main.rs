@@ -11,11 +11,11 @@ fn main() {
         simplelog::TerminalMode::Stderr,
         simplelog::ColorChoice::Auto,
     );
-    if args().len() <= 1 {
-        error!("pass a dot file");
+    if args().len() <= 1 || args().len() > 3 {
+        error!("pass a dot file or number of nodes or edges to generate");
         return;
     }
-    let data = if args().len() == 1 {
+    let data = if args().len() == 2 {
         let mut file = File::open(args().last().unwrap()).unwrap();
         let mut data = String::new();
         file.read_to_string(&mut data).unwrap();
@@ -30,6 +30,9 @@ fn main() {
     };
 
     let mut dot = read_dot::parse(&data).expect("parse error");
+    if dot.graph.nodes_count() == 0 {
+        return;
+    }
     to_dag::to_dag(&mut dot.graph);
     let mut ranks = graph::rank_with_components(&dot.graph);
     graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);

@@ -1,4 +1,4 @@
-use graph;
+use graph::{self, generator};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -43,11 +43,13 @@ impl Graph {
         match &mut self.graph {
             Err(e) => (String::from("<pre>") + e + "</pre>").into(),
             Ok(dot) => {
-                // let mut ranks = graph::rank::rank(&mut dot_graph.graph);
-                let mut ranks = graph::rank_with_components(&dot.graph);
-                //    graph::ns::network_simplex(&mut dot.graph, graph::ns::Postprocess::None);
-                graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
+                if dot.graph.nodes_count() == 0 {
+                    return r#"<svg viewBox="0 0 40 90" xmlns="http://www.w3.org/2000/svg"></svg>"#
+                        .into();
+                }
                 //FIXME: there is no reason to keep proccessing devided, need to be reworked
+                let mut ranks = graph::rank_with_components(&dot.graph);
+                graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
                 let mut output = vec![];
                 let places = graph::place::places3(&dot.graph, &ranks);
                 let coords = graph::xcoord::x_coordinates(&dot.graph, &ranks, &places);
@@ -70,4 +72,9 @@ pub fn main_js() -> Result<(), JsValue> {
 #[wasm_bindgen]
 pub fn parse(dot: &JsValue) -> JsValue {
     Graph::new(dot).into()
+}
+
+#[wasm_bindgen]
+pub fn render_random(nodes_count: u32, edges_count: u32) -> JsValue {
+    generator::random(nodes_count, edges_count).into()
 }
