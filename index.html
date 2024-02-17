@@ -5,25 +5,10 @@
   <meta charset="UTF-8">
   <title>Graphoscope</title>
   <script src="./bootstrap.js"></script>
-  <script>
-    var lastId = undefined;
-    var lastColor;
-    function outputClickHandler(id) {
-      if (lastId) {
-        document.getElementById(lastId).setAttribute('fill', lastColor);
-      }
-      const item = document.getElementById(id);
-      lastColor = item.getAttribute('fill')
-      lastId = id;
-      item.setAttribute('fill', 'green')
-    }
-
-    function visualize(data) {
-      document.getElementById("input").value = 'digraph g {' + data + '}'
-      document.getElementById("update").click()
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.5.0/dist/svg-pan-zoom.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yegor256/tacit@gh-pages/tacit-css-1.5.5.min.css" />
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     @media (min-width: 1250px) {
@@ -36,49 +21,70 @@
 
       #output {
         display: flex;
-        height: 100%;
       }
+    }
+
+    #output>svg {
+      width: 100%;
+      height: 90vh;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 200px auto;
+      gap: 10mm;
+      height: 20%;
     }
   </style>
 </head>
 
 <body>
+  <a class="github-fork-ribbon" href="https://github.com/mikhail-m1/graphoscope" data-ribbon="Fork me on GitHub"
+    title="Fork me on GitHub">Fork me on GitHub</a>
 
   <nav>
     <h1>Graphoscope</h1>
-    <a href="https://github.com/mikhail-m1/graphoscope">github</a>
   </nav>
 
   <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
-  <div style=" min-width: 10cm; max-width: 90%; margin-left: auto; margin-right: auto;">
+  <div style="min-width: 10cm; max-width: 90%; margin-left: auto; margin-right: auto;">
     <div class="grid">
       <div>
         <input type="file" id="browse" />
         <div>
           <textarea id="input" rows="15" cols="80"></textarea>
         </div>
-        <button id="update">Update</button>
-
-        <div>
-          Examples:
-          <ul>
-            <li>
-              <a onclick="visualize('a->b;b->c;b->d;c->e;d->e;a->b1;b1->b2;b2->b3;b3->b4;b4->b5;b5->e;')">Simple</a>
-            </li>
-            <li>
-              <a
-                onclick="visualize('S8->9;S24->27;S24->25;S1->10;S1->2;S35->36;S35->43;S30->31;S30->33;9->42;9->T1;25->T1;25->26;27->T24;2->3;2->16;2->17;2->T1;2->18;10->11;10->14;10->T1;10->13;10->12;31->T1;31->32;33->T30;33->34;42->4;26->4;3->4;16->15;17->19;18->29;11->4;14->15;37->39;37->41;37->38;37->40;13->19;12->29;43->38;43->40;36->19;32->23;34->29;39->15;41->29;38->4;40->19;4->5;19->21;19->20;19->28;5->6;5->T35;5->23;21->22;20->15;28->29;6->7;15->T1;22->23;22->T35;29->T30;7->T8;23->T24;23->T1;')">Big</a>
-            </li>
-            <li>
-              <a onclick="visualize('a->b;b->c;c->d;d->a;')">Loop</a>
-            </li>
-          </ul>
+        <div class="grid2">
+          <div>
+            <button id="update">Update</button>
+            Examples:
+            <ul>
+              <li>
+                <a onclick="visualize('a->b;b->c;b->d;c->e;d->e;a->b1;b1->b2;b2->b3;b3->b4;b4->b5;b5->e;')">Simple</a>
+              </li>
+              <li>
+                <a
+                  onclick="visualize('S8->9;S24->27;S24->25;S1->10;S1->2;S35->36;S35->43;S30->31;S30->33;9->42;9->T1;25->T1;25->26;27->T24;2->3;2->16;2->17;2->T1;2->18;10->11;10->14;10->T1;10->13;10->12;31->T1;31->32;33->T30;33->34;42->4;26->4;3->4;16->15;17->19;18->29;11->4;14->15;37->39;37->41;37->38;37->40;13->19;12->29;43->38;43->40;36->19;32->23;34->29;39->15;41->29;38->4;40->19;4->5;19->21;19->20;19->28;5->6;5->T35;5->23;21->22;20->15;28->29;6->7;15->T1;22->23;22->T35;29->T30;7->T8;23->T24;23->T1;')">Big</a>
+              </li>
+              <li>
+                <a onclick="visualize('a->b;b->c;c->d;d->a;')">Loop</a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            Random
+            <div>
+              Nodes: <input type="number" value="20" style="width: 7em" id="nodes_count" min="1" max="200" />
+            </div>
+            <div>
+              Edges: <input type="number" value="40" style="width: 7em" id="edges_count" min="1" max="200" />
+            </div>
+            <button id="generate">Generate</button>
+          </div>
         </div>
       </div>
-
-      <div id="output" style="height: 1000px" />
-
+      <article id="output"></article>
     </div>
   </div>
 </body>
