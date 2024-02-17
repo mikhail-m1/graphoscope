@@ -19,8 +19,11 @@ function handleFiles() {
 
 update_button.onclick = function () {
     context = wasm.parse(input.value);
+    const is_error = context.is_error();
     output.innerHTML = context.render();
-    svgPanZoom(output.childNodes[0]);
+    if (!is_error) {
+        svgPanZoom(output.childNodes[0]);
+    }
 }
 
 generate_button.onclick = function () {

@@ -1,19 +1,32 @@
 #[macro_use]
 extern crate log;
+use read_dot::DotGraph;
+
 use self::graph::*;
 use std::fmt::Debug;
 
 pub mod add_virtual_nodes;
 pub mod draw;
+pub mod generator;
 pub mod graph;
 pub mod ns;
 pub mod place;
 pub mod read_dot;
 pub mod to_dag;
 pub mod xcoord;
-pub mod generator;
 extern crate pest;
 extern crate pest_derive;
+
+pub fn full_draw<'a>(mut dot: DotGraph<'a>) -> Vec<u8> {
+    to_dag::to_dag(&mut dot.graph);
+    let mut ranks = rank_with_components(&dot.graph);
+    add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
+    let places = place::places3(&dot.graph, &ranks);
+    let coords = xcoord::x_coordinates(&dot.graph, &ranks, &places);
+    let mut output = vec![];
+    draw::draw(&dot, &ranks, &coords, &mut output);
+    output
+}
 
 pub fn rank_with_components<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
     let (components, map) = split_components(graph);

@@ -1,3 +1,5 @@
+use std::mem::swap;
+
 use graph::{self, generator};
 use wasm_bindgen::prelude::*;
 
@@ -39,21 +41,21 @@ impl Graph {
         }
     }
 
+    pub fn is_error(&self) -> JsValue {
+        self.graph.is_err().into()
+    }
+
     pub fn render(&mut self) -> JsValue {
-        match &mut self.graph {
-            Err(e) => (String::from("<pre>") + e + "</pre>").into(),
+        let mut graph = Err("Done".to_string());
+        swap(&mut self.graph, &mut graph);
+        match graph {
+            Err(e) => (String::from("<pre>") + &e + "</pre>").into(),
             Ok(dot) => {
                 if dot.graph.nodes_count() == 0 {
-                    return r#"<svg viewBox="0 0 40 90" xmlns="http://www.w3.org/2000/svg"></svg>"#
+                    return r#"<svg viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg"></svg>"#
                         .into();
                 }
-                //FIXME: there is no reason to keep proccessing devided, need to be reworked
-                let mut ranks = graph::rank_with_components(&dot.graph);
-                graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
-                let mut output = vec![];
-                let places = graph::place::places3(&dot.graph, &ranks);
-                let coords = graph::xcoord::x_coordinates(&dot.graph, &ranks, &places);
-                graph::draw::draw(&dot, &ranks, &coords, &mut output);
+                let output = graph::full_draw(dot);
                 std::str::from_utf8(&output).unwrap().into()
             }
         }

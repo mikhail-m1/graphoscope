@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate log;
-use graph::{generator, read_dot, to_dag};
+use graph::{generator, read_dot};
 extern crate simplelog;
 use std::{env::args, fs::File, io::Read, str};
 
@@ -29,18 +29,11 @@ fn main() {
         )
     };
 
-    let mut dot = read_dot::parse(&data).expect("parse error");
+    let dot = read_dot::parse(&data).expect("parse error");
     if dot.graph.nodes_count() == 0 {
         return;
     }
-    to_dag::to_dag(&mut dot.graph);
-    let mut ranks = graph::rank_with_components(&dot.graph);
-    graph::add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
-    let places = graph::place::places3(&dot.graph, &ranks);
-    let coords = graph::xcoord::x_coordinates(&dot.graph, &ranks, &places);
-    let mut output = vec![];
-    graph::draw::draw(&dot, &ranks, &coords, &mut output);
-
+    let output = graph::full_draw(dot);
     let res = str::from_utf8(&output).expect("invalid utf");
     print!("{}", res);
 }
