@@ -10,7 +10,6 @@ pub fn random(nodes_count: u32, edges_count: u32) -> String {
         let mut unconnected = vec![true; nodes_count as usize];
         let mut unconnected_count = nodes_count;
         for _ in 0..edges_count {
-            debug!("{} {:?}", unconnected_count, unconnected);
             let (from, to) = if unconnected_count == 0 {
                 (rng.gen_range(0..nodes_count), rng.gen_range(0..nodes_count))
             } else {

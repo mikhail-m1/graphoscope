@@ -29,7 +29,7 @@
       height: 90vh;
     }
 
-    .grid2 {
+    .grid_after_input {
       display: grid;
       grid-template-columns: 200px auto;
       gap: 10mm;
@@ -55,8 +55,14 @@
         <div>
           <textarea id="input" rows="15" cols="80"></textarea>
         </div>
-        <div class="grid2">
+        <div class="grid_after_input">
           <div>
+            <div>
+              Max nodes: <input type="number" value="200" style="width: 4em" id="max_nodes" min="1" max="200" />
+            </div>
+            <div>
+              Max edges: <input type="number" value="200" style="width: 4em" id="max_edges" min="1" max="200" />
+            </div>
             <button id="update">Update</button>
             Examples:
             <ul>
@@ -72,13 +78,13 @@
               </li>
             </ul>
           </div>
-          <div>
-            Random
+          <div style="border:1px solid #d9d9d9; padding: 10px; margin: 10px;">
+            <h4>Random</h4>
             <div>
-              Nodes: <input type="number" value="20" style="width: 7em" id="nodes_count" min="1" max="200" />
+              Nodes: <input type="number" value="20" style="width: 5em" id="nodes_count" min="1" max="2000" />
             </div>
             <div>
-              Edges: <input type="number" value="40" style="width: 7em" id="edges_count" min="1" max="200" />
+              Edges: <input type="number" value="40" style="width: 5em" id="edges_count" min="1" max="3000" />
             </div>
             <button id="generate">Generate</button>
           </div>

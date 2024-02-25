@@ -90,6 +90,17 @@ impl<T> DirectedGraph<T> {
         }
     }
 
+    pub fn set_original_id(&mut self, node_id: NodeId, id: T)
+    where
+        T: Default,
+    {
+        if self.original_node_ids.len() < self.nodes_count() as usize {
+            self.original_node_ids
+                .resize_with(self.nodes_count() as usize, || T::default());
+        }
+        self.original_node_ids[node_id.0 as usize] = id;
+    }
+
     pub fn node_mut(&mut self, id: NodeId) -> &mut Node {
         &mut self.nodes[id.0 as usize]
     }
@@ -101,6 +112,10 @@ impl<T> DirectedGraph<T> {
 
     pub fn iter_nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
+    }
+
+    pub fn iter_nodes_ids(&self) -> impl Iterator<Item = NodeId> {
+        (0..self.nodes_count()).map(|n| NodeId::from(n))
     }
 
     pub fn iter_nodes_with_id(&self) -> impl Iterator<Item = (NodeId, &Node)> {
@@ -183,6 +198,7 @@ impl<T> DirectedGraph<T> {
         }
     }
 
+    // TOOD: refactor to add edge to nodes
     pub fn add_edge(&mut self, edge: Edge) -> EdgeId {
         self.edges.push(edge);
         EdgeId::from(self.edges.len() as u32 - 1)
@@ -485,7 +501,7 @@ impl Edge {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DirectedGraph<T> {
     roots: Vec<NodeId>,
     nodes: Vec<Node>,

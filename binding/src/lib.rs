@@ -1,6 +1,5 @@
-use std::mem::swap;
-
-use graph::{self, generator};
+use graph::{self, generator, subgraph};
+use log::info;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -28,6 +27,14 @@ impl Graph {
             graph::to_dag::to_dag(&mut g.graph);
             g
         });
+        match &graph {
+            Ok(g) => info!(
+                "New Graph {} nodes and {} edges",
+                g.graph.nodes_count(),
+                g.graph.edges_count()
+            ),
+            Err(e) => log::error!("Parse failed: {e}"),
+        }
         Self {
             _input: input,
             graph,
@@ -45,18 +52,31 @@ impl Graph {
         self.graph.is_err().into()
     }
 
-    pub fn render(&mut self) -> JsValue {
-        let mut graph = Err("Done".to_string());
-        swap(&mut self.graph, &mut graph);
-        match graph {
+    pub fn render(&mut self, around_node_id: &str, max_nodes: u32, max_edges: u32) -> JsValue {
+        match &self.graph {
             Err(e) => (String::from("<pre>") + &e + "</pre>").into(),
             Ok(dot) => {
-                if dot.graph.nodes_count() == 0 {
+                if dot.graph.nodes_count() == 0 || max_nodes == 0 {
                     return r#"<svg viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg"></svg>"#
                         .into();
                 }
-                let output = graph::full_draw(dot);
-                std::str::from_utf8(&output).unwrap().into()
+                let start_node_id = (around_node_id.len() != 0).then(|| {
+                    let name = &around_node_id[4..];
+                    dot.graph
+                        .iter_nodes_with_id()
+                        .filter_map(|(id, _)| {
+                            (dot.graph.original_id(id) == Some(&name)).then_some(id)
+                        })
+                        .next()
+                        .unwrap()
+                });
+                let dot =
+                    if dot.graph.nodes_count() > max_nodes || dot.graph.edges_count() > max_edges {
+                        subgraph(dot, start_node_id, max_nodes, max_edges)
+                    } else {
+                        (*dot).clone()
+                    };
+                std::str::from_utf8(&graph::full_draw(dot)).unwrap().into()
             }
         }
     }
@@ -66,6 +86,7 @@ impl Graph {
 pub fn main_js() -> Result<(), JsValue> {
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
+    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
     //alert("OK");
     //console::log_1(&JsValue::from_str("Hello world!"));
     Ok(())

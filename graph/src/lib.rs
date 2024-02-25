@@ -28,6 +28,73 @@ pub fn full_draw<'a>(mut dot: DotGraph<'a>) -> Vec<u8> {
     output
 }
 
+pub fn subgraph<'a>(
+    dot: &'a DotGraph,
+    opt_start: Option<NodeId>,
+    max_nodes: u32,
+    max_edges: u32,
+) -> DotGraph<'a> {
+    let start = opt_start
+        .or(dot.graph.roots().get(0).copied())
+        .expect("need start");
+    debug!("subgraph: start from {start:?}");
+    //TODO: remember used root
+    let mut output = DirectedGraph::default();
+    let mut map = dot.graph.node_map::<Option<NodeId>>();
+    let mut queue = vec![start];
+    let mut next_queue = vec![];
+    while !queue.is_empty() && output.nodes_count() < max_nodes && output.edges_count() < max_edges
+    {
+        let node_id = queue.pop().unwrap();
+        if map.get(node_id).is_none() {
+            let new_node_id = output.add_node(Node::default());
+            debug!("subgraph: add {node_id:?} as {new_node_id:?}");
+            map.set(node_id, Some(new_node_id));
+            for (_, _, edge, direction) in dot.graph.iter_node_edges(node_id) {
+                let (other_id, is_output) = if direction == Direction::Output {
+                    (edge.to, true)
+                } else {
+                    (edge.from, false)
+                };
+                if let Some(new_other_id) = map.get(other_id).to_owned() {
+                    debug!("subgraph: copy edge {edge:?}");
+                    // TODO: copy edge params
+                    let edge_id = output.add_edge(if is_output {
+                        Edge::new(new_node_id, new_other_id)
+                    } else {
+                        Edge::new(new_other_id, new_node_id)
+                    });
+                    if is_output {
+                        output.node_mut(new_node_id).outputs.push(edge_id);
+                        output.node_mut(new_other_id).inputs.push(edge_id);
+                    } else {
+                        output.node_mut(new_other_id).outputs.push(edge_id);
+                        output.node_mut(new_node_id).inputs.push(edge_id);
+                    }
+                } else {
+                    debug!("subgraph: push {other_id:?} to next queue");
+                    next_queue.push(other_id);
+                }
+            }
+        }
+        if queue.is_empty() {
+            debug!("subgraph: next step size {}", next_queue.len());
+            std::mem::swap(&mut queue, &mut next_queue);
+        }
+    }
+    info!(
+        "subgraph: output {} nodes and {} edges, input {} and {}, limits {} and {}",
+        output.nodes_count(),
+        output.edges_count(),
+        dot.graph.nodes_count(),
+        dot.graph.edges_count(),
+        max_nodes,
+        max_edges
+    );
+    // map labels
+    dot.map_to_new(output, map)
+}
+
 pub fn rank_with_components<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
     let (components, map) = split_components(graph);
     if components.len() == 1 {
@@ -158,9 +225,9 @@ pub fn split_components<T: Debug>(
     }
     // No need to copy self edge becase those doesn't affect Y position.
 
-    debug!("split_components: {:?}", graph);
-    debug!("split_components: {:?}", s.map);
-    debug!("split_components: {:?}", s.components);
+    debug!("split_components: graph {:?}", graph);
+    debug!("split_components: node map {:?}", s.map);
+    debug!("split_components: components {:?}", s.components);
 
     assert_eq!(
         graph.edges_count(),
@@ -259,6 +326,16 @@ mod tests {
             ranks.iter().map(|(_, &v)| v).collect::<Vec<_>>(),
             &[0, 0, 1, 2]
         );
+    }
+
+    #[test]
+    fn test_subgraph() {
+        let _ = init_log();
+        let dot = read_dot::parse("digraph x {a->b; a->c; a->d; a->e; b->f; b->c;}").unwrap();
+        let new = subgraph(&dot, None, 3, 10);
+        assert_eq!(new.graph.nodes_count(), 3);
+        assert_eq!(new.graph.nodes_count(), 3);
+        //TODO: add more cases and checks.
     }
 
     pub fn init_log() {

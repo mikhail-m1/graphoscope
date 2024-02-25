@@ -6,5 +6,5 @@ rm *.wasm
 cp www/dist/* .
 git add *.wasm
 git commit -am update
-git push 
-git co main
+echo git push 
+echo git co main

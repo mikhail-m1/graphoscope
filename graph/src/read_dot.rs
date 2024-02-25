@@ -7,9 +7,30 @@ use pest::{iterators::Pair, Parser};
 #[grammar = "dot.pest"]
 struct DotParser;
 
+#[derive(Clone)]
 pub struct DotGraph<'a> {
     pub graph: DirectedGraph<&'a str>,
     pub labels: NodeMap<Option<&'a str>>,
+}
+
+impl<'a> DotGraph<'a> {
+    pub fn map_to_new(
+        &self,
+        mut new: DirectedGraph<&'a str>,
+        map: NodeMap<Option<NodeId>>,
+    ) -> DotGraph<'a> {
+        let mut new_labels = new.node_map();
+        for (old, opt_new) in map.iter() {
+            if let &Some(new_id) = opt_new {
+                new_labels.set(new_id, self.labels.get(old).to_owned());
+                new.set_original_id(new_id, self.graph.original_id(old).unwrap())
+            }
+        }
+        DotGraph {
+            graph: new,
+            labels: new_labels,
+        }
+    }
 }
 
 pub fn parse<'a>(data: &'a str) -> Result<DotGraph<'a>, String> {

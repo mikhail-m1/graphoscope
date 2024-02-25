@@ -3,6 +3,7 @@ use std::mem::swap;
 
 use crate::graph::*;
 
+#[derive(Debug)]
 enum Action {
     EnterToRoot(NodeId),
     Enter {
@@ -17,15 +18,33 @@ pub fn to_dag<T: Debug>(graph: &mut DirectedGraph<T>) {
     let mut visited_count = 0;
     let mut visited = graph.node_map::<bool>();
     let mut path = graph.node_map::<bool>();
+
+    if graph.roots().is_empty() {
+        for id in graph.iter_nodes_ids() {
+            if graph.node(id).inputs.is_empty() {
+                graph.add_root(id)
+            }
+        }
+    }
+
     let mut stack: Vec<_> = graph
         .roots()
         .iter()
         .map(|&n| Action::EnterToRoot(n))
         .collect();
 
+    if stack.is_empty() {
+        stack.extend(
+            graph
+                .iter_nodes_with_id()
+                .filter_map(|(id, n)| n.inputs.is_empty().then(|| Action::EnterToRoot(id))),
+        );
+    }
+
     while visited_count != graph.nodes_count() {
         if stack.is_empty() {
             // converts first unvisited node to the root by reverting all input edges
+            // TODO: need to rework, maybe we don't need roots or can use rank to find it.
             let first_unvisited = visited.find_first(|v| !v).unwrap();
             stack.push(Action::EnterToRoot(first_unvisited));
             let first_node = graph.node_mut(first_unvisited);
@@ -39,9 +58,11 @@ pub fn to_dag<T: Debug>(graph: &mut DirectedGraph<T>) {
                 graph.node_mut(from_id).to_input(edge_id);
             }
             graph.add_root(first_unvisited);
+            debug!("to_dag: stack_empty, add_root {first_unvisited:?}");
         }
 
         while let Some(action) = stack.pop() {
+            debug!("to_dag: pop {action:?}");
             match action {
                 Action::Leave(id) => path.set(id, false),
                 Action::EnterToRoot(to_node_id) => {
