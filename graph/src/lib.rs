@@ -35,7 +35,8 @@ pub fn subgraph<'a>(
     max_edges: u32,
 ) -> (DotGraph<'a>, NodeMap<(u32, u32)>) {
     let start = opt_start
-        .or(dot.graph.roots().get(0).copied())
+        .or_else(|| dot.graph.roots().get(0).copied())
+        .or_else(|| dot.graph.iter_nodes_ids().next())
         .expect("need start");
     debug!("subgraph: start from {start:?}");
     //TODO: remember used root
