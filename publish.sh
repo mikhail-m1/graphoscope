@@ -1,4 +1,5 @@
 #!/bin/sh -xe
+git diff --quiet || (git status && false)
 (cd binding && wasm-pack build)
 (cd www && npm run build)
 git checkout gh-pages
@@ -6,5 +7,5 @@ rm *.wasm
 cp www/dist/* .
 git add *.wasm
 git commit -am update
-echo git push 
-echo git co main
+git push 
+git co main
