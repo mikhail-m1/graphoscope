@@ -30,12 +30,14 @@ fn main() {
     if dot.graph.nodes_count() == 0 {
         return;
     }
-    let dot = if dot.graph.nodes_count() > 3 {
-        graph::subgraph(&dot, None, args.max_nodes, args.max_edges)
-    } else {
-        dot
-    };
-    let output = graph::full_draw(dot);
+    let (dot, extra_edges) =
+        if dot.graph.nodes_count() > args.max_nodes || dot.graph.edges_count() > args.max_edges {
+            let (subdot, extra_edges) = graph::subgraph(&dot, None, args.max_nodes, args.max_edges);
+            (subdot, Some(extra_edges))
+        } else {
+            (dot, None)
+        };
+    let output = graph::full_draw(dot, extra_edges.as_ref());
     let res = str::from_utf8(&output).expect("invalid utf");
     print!("{}", res);
 }

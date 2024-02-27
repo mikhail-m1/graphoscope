@@ -10,6 +10,7 @@ pub fn draw<'a, W: Write>(
     dot: &DotGraph<'a>,
     ranks: &NodeMap<i32>,
     places: &NodeMap<u32>,
+    extra_edges: Option<&NodeMap<(u32, u32)>>,
     write: W,
 ) {
     let graph = &dot.graph;
@@ -134,6 +135,30 @@ pub fn draw<'a, W: Write>(
                         .set("font-size", 4),
                 );
             }
+
+            let (extra_in_count, extra_out_count) =
+                extra_edges.map(|v| *v.get(id)).unwrap_or((0, 0));
+            if extra_in_count != 0 {
+                group = group.add(
+                    Text::new()
+                        .add(NodeText::new(format!("←{extra_in_count}")))
+                        .set("x", "100%")
+                        .set("y", "12%")
+                        .set("text-anchor", "end")
+                        .set("font-size", 3),
+                );
+            }
+            if extra_out_count != 0 {
+                group = group.add(
+                    Text::new()
+                        .add(NodeText::new(format!("→{extra_out_count}")))
+                        .set("x", "100%")
+                        .set("y", "98%")
+                        .set("text-anchor", "end")
+                        .set("font-size", 3),
+                );
+            }
+
             document = document.add(group);
         }
         max_x = max_x.max(*places.get(id));
@@ -172,7 +197,7 @@ mod tests {
         p.set(NodeId::from(1u32), 1);
         p.set(NodeId::from(3u32), 1);
         let mut s = vec![];
-        draw(&dot, &ranks, &p, &mut s);
+        draw(&dot, &ranks, &p, None, &mut s);
         // assert_eq!(std::str::from_utf8(&s[..]).unwrap(), ""); TODO
     }
 }

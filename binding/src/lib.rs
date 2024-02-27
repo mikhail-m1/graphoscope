@@ -70,13 +70,17 @@ impl Graph {
                         .next()
                         .unwrap()
                 });
-                let dot =
+                let (dot, extra_edges) =
                     if dot.graph.nodes_count() > max_nodes || dot.graph.edges_count() > max_edges {
-                        subgraph(dot, start_node_id, max_nodes, max_edges)
+                        let (subgraph, extra_edges) =
+                            subgraph(dot, start_node_id, max_nodes, max_edges);
+                        (subgraph, Some(extra_edges))
                     } else {
-                        (*dot).clone()
+                        ((*dot).clone(), None)
                     };
-                std::str::from_utf8(&graph::full_draw(dot)).unwrap().into()
+                std::str::from_utf8(&graph::full_draw(dot, extra_edges.as_ref()))
+                    .unwrap()
+                    .into()
             }
         }
     }

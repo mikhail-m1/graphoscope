@@ -1,6 +1,6 @@
 # TODO
 ## big graph support in web
-* visualize missing edges
+* bug fails with graph/src/lib.rs:39:10:need start
 * add node search
 * check graph when one node connected to all (another generator)
 

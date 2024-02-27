@@ -17,14 +17,14 @@ pub mod xcoord;
 extern crate pest;
 extern crate pest_derive;
 
-pub fn full_draw<'a>(mut dot: DotGraph<'a>) -> Vec<u8> {
+pub fn full_draw<'a>(mut dot: DotGraph<'a>, extra_edges: Option<&NodeMap<(u32, u32)>>) -> Vec<u8> {
     to_dag::to_dag(&mut dot.graph);
     let mut ranks = rank_with_components(&dot.graph);
     add_virtual_nodes::add_virtual_nodes(&mut dot.graph, &mut ranks);
     let places = place::places3(&dot.graph, &ranks);
     let coords = xcoord::x_coordinates(&dot.graph, &ranks, &places);
     let mut output = vec![];
-    draw::draw(&dot, &ranks, &coords, &mut output);
+    draw::draw(&dot, &ranks, &coords, extra_edges, &mut output);
     output
 }
 
@@ -33,7 +33,7 @@ pub fn subgraph<'a>(
     opt_start: Option<NodeId>,
     max_nodes: u32,
     max_edges: u32,
-) -> DotGraph<'a> {
+) -> (DotGraph<'a>, NodeMap<(u32, u32)>) {
     let start = opt_start
         .or(dot.graph.roots().get(0).copied())
         .expect("need start");
@@ -91,8 +91,23 @@ pub fn subgraph<'a>(
         max_nodes,
         max_edges
     );
+    let mut extra_edges = output.node_map();
+    for (id, &new_id_opt) in map.iter() {
+        if let Some(new_id) = new_id_opt {
+            let node = dot.graph.node(id);
+            let new_node = output.node(new_id);
+            extra_edges.set(
+                new_id,
+                (
+                    (node.inputs.len() - new_node.inputs.len()) as u32,
+                    (node.outputs.len() - new_node.outputs.len()) as u32,
+                ),
+            );
+        }
+    }
+
     // map labels
-    dot.map_to_new(output, map)
+    (dot.map_to_new(output, map), extra_edges)
 }
 
 pub fn rank_with_components<T: Debug>(graph: &DirectedGraph<T>) -> NodeMap<i32> {
@@ -332,7 +347,7 @@ mod tests {
     fn test_subgraph() {
         let _ = init_log();
         let dot = read_dot::parse("digraph x {a->b; a->c; a->d; a->e; b->f; b->c;}").unwrap();
-        let new = subgraph(&dot, None, 3, 10);
+        let (new, _) = subgraph(&dot, None, 3, 10);
         assert_eq!(new.graph.nodes_count(), 3);
         assert_eq!(new.graph.nodes_count(), 3);
         //TODO: add more cases and checks.
