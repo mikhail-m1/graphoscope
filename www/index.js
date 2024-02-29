@@ -11,6 +11,8 @@ const max_nodes = document.getElementById("max_nodes");
 const max_edges = document.getElementById("max_edges");
 const nodes_count = document.getElementById("nodes_count");
 const edges_count = document.getElementById("edges_count");
+const focus = document.getElementById("focus");
+const focus_options = document.getElementById("focus_options");
 var currentId = "";
 var lastColor;
 
@@ -44,11 +46,22 @@ generate_button.onclick = function () {
     document.getElementById('update').click();
 }
 
+focus.addEventListener('input', _ => {
+    if (!context) {
+        return;
+    }
+    const items = context.find_nodes(focus.value);
+    focus_options.innerHTML = items.splice(0, 10)
+        .map(v => '<li><a onclick="document.outputClickHandler(\'svg_' + v + '\')">' + v + '</a></li>')
+        .join('');
+})
+
 document.outputClickHandler = id => {
     if (currentId) {
         document.getElementById(currentId).setAttribute('fill', lastColor);
     }
     currentId = id;
+    focus.value = id.substr(4);
     update_render();
     const item = document.getElementById(id);
     lastColor = item.getAttribute('fill')
@@ -58,6 +71,7 @@ document.outputClickHandler = id => {
 
 document.visualize = data => {
     input.value = 'digraph g {' + data + '}'
+    currentId = '';
     update_button.click()
 }
 

@@ -52,7 +52,7 @@ impl Graph {
         self.graph.is_err().into()
     }
 
-    pub fn render(&mut self, around_node_id: &str, max_nodes: u32, max_edges: u32) -> JsValue {
+    pub fn render(&self, around_node_id: &str, max_nodes: u32, max_edges: u32) -> JsValue {
         match &self.graph {
             Err(e) => (String::from("<pre>") + &e + "</pre>").into(),
             Ok(dot) => {
@@ -83,6 +83,20 @@ impl Graph {
                     .into()
             }
         }
+    }
+
+    pub fn find_nodes(&self, value: &str) -> JsValue {
+        (if let Ok(dot) = &self.graph {
+            dot.graph
+                .iter_nodes_ids()
+                .flat_map(|id| dot.graph.original_id(id).into_iter())
+                .filter(|oid| oid.to_lowercase().contains(&value.to_lowercase()))
+                .map(|&id| JsValue::from(id))
+                .collect::<js_sys::Array>()
+        } else {
+            js_sys::Array::new()
+        })
+        .into()
     }
 }
 

@@ -1,16 +1,15 @@
 # TODO
 ## big graph support in web
-* add node search
+* improve zoom, check touch interface
 * check graph when one node connected to all (another generator)
-
-## refactor
-* fix graph::add_edge
+* node search by label
 
 ## bug / improvment
 * check why right and right_explicit return different result, it's in place.rs
  looks like it depends from order, just mirror graph if first level node on the right.
 
 ## graph
+* fix graph::add_edge
 * make graph api consistent, migrate loops to it
 * ns: remove length?
 * ns: unify shift
