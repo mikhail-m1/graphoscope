@@ -2,7 +2,6 @@
 ## big graph support in web
 * improve zoom, check touch interface
 * check graph when one node connected to all (another generator)
-* node search by label
 
 ## bug / improvment
 * check why right and right_explicit return different result, it's in place.rs

@@ -35,6 +35,9 @@ function update_render() {
 }
 
 update_button.onclick = function () {
+    focus_options.innerHTML = ""
+    focus.value = ""
+    currentId = ""
     context = wasm.parse(input.value);
     update_render();
 }
@@ -52,7 +55,8 @@ focus.addEventListener('input', _ => {
     }
     const items = context.find_nodes(focus.value);
     focus_options.innerHTML = items.splice(0, 10)
-        .map(v => '<li><a onclick="document.outputClickHandler(\'svg_' + v + '\')">' + v + '</a></li>')
+        .map(v => '<li><a onclick="document.outputClickHandler(\'svg_'
+            + v.id() + '\')">' + v.id() + ' ' + v.label() + '</a></li>')
         .join('');
 })
 
@@ -71,7 +75,6 @@ document.outputClickHandler = id => {
 
 document.visualize = data => {
     input.value = 'digraph g {' + data + '}'
-    currentId = '';
     update_button.click()
 }
 

@@ -15,6 +15,23 @@ pub struct Graph {
 }
 
 #[wasm_bindgen]
+pub struct SearchResultItem {
+    id: String,
+    label: String,
+}
+
+#[wasm_bindgen]
+impl SearchResultItem {
+    pub fn id(&self) -> JsValue {
+        self.id.clone().into()
+    }
+
+    pub fn label(&self) -> JsValue {
+        self.label.clone().into()
+    }
+}
+
+#[wasm_bindgen]
 impl Graph {
     pub fn new(dot: &JsValue) -> Self {
         let input: String = dot.as_string().unwrap();
@@ -86,12 +103,20 @@ impl Graph {
     }
 
     pub fn find_nodes(&self, value: &str) -> JsValue {
+        let value = &value.to_lowercase();
         (if let Ok(dot) = &self.graph {
             dot.graph
                 .iter_nodes_ids()
-                .flat_map(|id| dot.graph.original_id(id).into_iter())
-                .filter(|oid| oid.to_lowercase().contains(&value.to_lowercase()))
-                .map(|&id| JsValue::from(id))
+                .filter_map(|id| {
+                    let &oid = dot.graph.original_id(id).unwrap();
+                    let label = dot.labels.get(id).unwrap_or("");
+                    (oid.to_lowercase().contains(value) || label.to_lowercase().contains(value))
+                        .then(|| SearchResultItem {
+                            id: oid.to_string(),
+                            label: label.to_string(),
+                        })
+                })
+                .map(|id| JsValue::from(id))
                 .collect::<js_sys::Array>()
         } else {
             js_sys::Array::new()

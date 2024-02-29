@@ -55,7 +55,9 @@ fn convert_graph<'a>(graph: Pair<'a, Rule>) -> DotGraph<'a> {
             Rule::node => {
                 let (id, label) = node(statement);
                 ids.push(id);
-                labels.insert(id, label);
+                if let Some(label) = label {
+                    labels.insert(id, label);
+                }
             }
             _ => unreachable!(),
         }
@@ -80,13 +82,13 @@ fn link<'a>(link: Pair<'a, Rule>) -> (&'a str, &'a str) {
     (from, to)
 }
 
-fn node<'a>(node: Pair<'a, Rule>) -> (&'a str, &'a str) {
+fn node<'a>(node: Pair<'a, Rule>) -> (&'a str, Option<&'a str>) {
     let mut items = node.into_inner();
     let name = items.next().unwrap().as_str();
-    let label = items.next().and_then(label).unwrap_or(name);
+    let label = items.next().and_then(extract_label);
     (name, label)
 }
 
-fn label<'a>(attributes: Pair<'a, Rule>) -> Option<&'a str> {
+fn extract_label<'a>(attributes: Pair<'a, Rule>) -> Option<&'a str> {
     attributes.into_inner().skip(1).next().map(|s| s.as_str())
 }
