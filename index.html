@@ -11,7 +11,7 @@
   </script>
   <meta charset="UTF-8">
   <title>Graphoscope</title>
-  <meta name="keywords" content="dot, visualize, big, graph, online" />
+  <meta name="keywords" content="dot, visualize, big, graph, online, interactive" />
   <meta name="description" content="Graphoscope: Big dot graph interactive visualization" />
   <script src="./bootstrap.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.5.0/dist/svg-pan-zoom.min.js"></script>
@@ -54,10 +54,16 @@
   <nav>
     <h1>Graphoscope</h1>
   </nav>
-
   <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
   <div style="min-width: 10cm; max-width: 90%; margin-left: auto; margin-right: auto;">
+    <blockquote>Graphoscope is an interactive graph visualization based on <a
+        href="https://graphviz.org/documentation/TSE93.pdf">DOT algorithm.</a>
+      Currently only simple dot files are supported (see examples and generated graphs for the details).
+      To navigate over a big graph you can use "Focus on" by node name or label or click on node you want to focus.
+      Touch devices are not fully supported.
+    </blockquote>
+
     <div class="grid">
       <div>
         <input type="file" id="browse" />
@@ -81,7 +87,8 @@
             Examples:
             <ul>
               <li>
-                <a onclick="visualize('a->b;b->c;b->d;c->e;d->e;a->b1;b1->b2;b2->b3;b3->b4;b4->b5;b5->e;')">Simple</a>
+                <a
+                  onclick="visualize('a[label=&quot;node a&quot;];a->b;b->c;b->d;c->e;d->e;a->b1;b1->b2;b2->b3;b3->b4;b4->b5;b5->e;')">Simple</a>
               </li>
               <li>
                 <a
