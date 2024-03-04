@@ -12,4 +12,4 @@ The long term goals are:
 
 It’s actually the reason why I started this project. I had a dot file with around 1000 nodes connected to one, and the dot from graphvis stuck for a long time and produced something unusable. So I decided to make something to work with those graphs.
 
-You can see the current version [here](https://mikhail-m1.github.io/graphoscope/), dotfile parser is primitive, and supports just basic syntax.
+You can see **[the current live version](https://mikhail-m1.github.io/graphoscope/)**, dotfile parser is primitive, and supports just basic syntax.

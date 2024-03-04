@@ -1,6 +1,8 @@
 # TODO
+
 ## big graph support in web
-* improve zoom, check touch interface
+* fix touch, no zoom on phone and clicks on nodes
+* highligh selected node edges and maybe one step nodes
 
 ## bug / improvment
 * check why right and right_explicit return different result, it's in place.rs
