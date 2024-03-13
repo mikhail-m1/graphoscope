@@ -1,5 +1,6 @@
 use graph::{self, generator, subgraph};
 use log::info;
+use ouroboros::self_referencing;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -9,9 +10,15 @@ extern "C" {
 
 #[wasm_bindgen]
 pub struct Graph {
-    _input: String,
-    //hack, reference to input
-    graph: Result<graph::read_dot::DotGraph<'static>, String>,
+    holder: Holder,
+}
+
+#[self_referencing]
+struct Holder {
+    input: String,
+    #[borrows(input)]
+    #[covariant]
+    graph: Result<graph::read_dot::DotGraph<'this>, String>,
 }
 
 #[wasm_bindgen]
@@ -35,42 +42,40 @@ impl SearchResultItem {
 impl Graph {
     pub fn new(dot: &JsValue) -> Self {
         let input: String = dot.as_string().unwrap();
-
-        // same struc in rust cannot hold data and referene on it
-        // in the futer we can copy all strings to internal graph structure
-        // and there is no need in the original graph
-        let input_static: &'static str = unsafe { std::mem::transmute(input.as_str()) };
-        let graph = graph::read_dot::parse(input_static).map(|mut g| {
-            graph::to_dag::to_dag(&mut g.graph);
-            g
-        });
-        match &graph {
-            Ok(g) => info!(
-                "New Graph {} nodes and {} edges",
-                g.graph.nodes_count(),
-                g.graph.edges_count()
-            ),
-            Err(e) => log::error!("Parse failed: {e}"),
-        }
         Self {
-            _input: input,
-            graph,
+            holder: HolderBuilder {
+                input,
+                graph_builder: |input| {
+                    graph::read_dot::parse(input)
+                        .map(|mut g| {
+                            info!(
+                                "New Graph {} nodes and {} edges",
+                                g.graph.nodes_count(),
+                                g.graph.edges_count()
+                            );
+                            graph::to_dag::to_dag(&mut g.graph);
+                            g
+                        })
+                        .inspect_err(|e| log::error!("Parse failed: {e}"))
+                },
+            }
+            .build(),
         }
     }
 
     pub fn node_count(&self) -> JsValue {
-        match &self.graph {
+        match &self.holder.borrow_graph() {
             Ok(g) => g.graph.nodes_count().into(),
             Err(e) => e.into(),
         }
     }
 
     pub fn is_error(&self) -> JsValue {
-        self.graph.is_err().into()
+        self.holder.borrow_graph().is_err().into()
     }
 
     pub fn render(&self, around_node_id: &str, max_nodes: u32, max_edges: u32) -> JsValue {
-        match &self.graph {
+        match &self.holder.borrow_graph() {
             Err(e) => (String::from("<pre>") + &e + "</pre>").into(),
             Ok(dot) => {
                 if dot.graph.nodes_count() == 0 || max_nodes == 0 {
@@ -104,7 +109,7 @@ impl Graph {
 
     pub fn find_nodes(&self, value: &str) -> JsValue {
         let value = &value.to_lowercase();
-        (if let Ok(dot) = &self.graph {
+        (if let Ok(dot) = &self.holder.borrow_graph() {
             dot.graph
                 .iter_nodes_ids()
                 .filter_map(|id| {
